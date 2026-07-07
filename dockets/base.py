@@ -323,7 +323,7 @@ def axis_points(poly: Polygon, n: int, inset: float
 
 
 def boundary_on_walls(ctx: Ctx, poly: Polygon, result: DocketResult,
-                      extra_subtract=None):
+                      extra_subtract=None, extra_wall_layers=None):
     """Portions of ``poly``'s boundary that sit on configured walls.
 
     Returns a (Multi)LineString.  Door openings are removed two ways: the
@@ -332,10 +332,19 @@ def boundary_on_walls(ctx: Ctx, poly: Polygon, result: DocketResult,
     subtracted explicitly.  When no wall layers are configured, the full
     boundary is used and a structured warning is recorded (never guessed
     from magic layer names).
+
+    ``extra_wall_layers`` adds zone-specific wall layers (e.g. a balloon
+    zone's own barrier layers) on top of the global wall set for this call.
     """
     boundary = LineString(poly.exterior.coords)
     wall_buffer_mm = config_loader.DEFAULTS["walls"]["wall_buffer_mm"]
     walls = ctx.wall_buffer(wall_buffer_mm)
+    if extra_wall_layers:
+        extra_segs = ctx.resolver.segments_on_layers(extra_wall_layers)
+        if extra_segs:
+            extra_buf = unary_union([s.buffer(wall_buffer_mm, cap_style=2)
+                                     for s in extra_segs])
+            walls = extra_buf if walls is None else walls.union(extra_buf)
     if walls is None:
         result.warn("no wall layers configured — using the full zone "
                     "boundary (door openings cannot be excluded)")
@@ -356,6 +365,120 @@ def geom_length(geom) -> float:
     if geom is None or geom.is_empty:
         return 0.0
     return float(geom.length)
+
+
+# ---------------------------------------------------------------------------
+# wall-frame import (shared: every docket output shows the walls for context)
+# ---------------------------------------------------------------------------
+
+def import_wall_frame(doc, ctx: "Ctx", out: Out, result: DocketResult) -> None:
+    """Copy the configured wall-frame layers into ``out`` for visual context.
+
+    Reads ``flooring.wall_frame`` (mirror + hatch layers, insert/block
+    excludes) from the config so EVERY docket's output can show the walls,
+    not just flooring.  Absence of configured layers means "no wall frame" —
+    never guessed from magic layer names.  Wall geometry nested inside blocks
+    is exploded to world space; copied hatch patterns are repaired.
+    """
+    wf = (ctx.cfg.get("flooring") or {}).get("wall_frame") or {}
+    layers = list(wf.get("mirror_layers") or []) + \
+        list(wf.get("hatch_layers") or [])
+    if not layers:
+        layers = list((ctx.cfg.get("walls") or {}).get("layers") or [])
+    if not layers:
+        return
+    wanted = {l.strip().lower() for l in ctx.resolver.match_layers(layers)}
+    if not wanted:
+        return
+    excl_layers = {l.strip().lower()
+                   for l in wf.get("exclude_insert_layers") or []}
+    excl_blocks = {b.strip().lower()
+                   for b in wf.get("exclude_block_names") or []}
+
+    def keep(e) -> bool:
+        try:
+            layer = (e.dxf.layer or "").strip().lower()
+        except Exception:
+            return False
+        if layer not in wanted:
+            return False
+        if e.dxftype() == "INSERT":
+            if layer in excl_layers or e.dxf.name.strip().lower() in excl_blocks:
+                return False
+        return True
+
+    entities = [e for e in doc.modelspace() if keep(e)]
+    verbatim = 0
+    if entities:
+        try:
+            from ezdxf.addons import Importer
+            importer = Importer(doc, out.doc)
+            importer.import_entities(entities, out.msp)
+            importer.finalize()
+            verbatim = len(entities)
+        except Exception as exc:
+            result.warn(f"wall frame import failed: {exc}")
+
+    # walls are often nested inside blocks (INSERT on an unrelated layer,
+    # contents carrying the wall layers) — explode those to world space
+    kept_ids = {id(e) for e in entities if e.dxftype() == "INSERT"}
+    nested = skipped = 0
+
+    def explode(insert, visited) -> None:
+        nonlocal nested, skipped
+        name = insert.dxf.name
+        if name in visited:
+            result.warn(f"cyclic block reference at '{name}' — stopped")
+            return
+        if name.strip().lower() in excl_blocks:
+            return
+        try:
+            if (insert.dxf.layer or "").strip().lower() in excl_layers:
+                return
+            virtual = list(insert.virtual_entities())
+        except Exception:
+            return
+        for ve in virtual:
+            if ve.dxftype() == "INSERT":
+                explode(ve, visited | {name})
+                continue
+            try:
+                if (ve.dxf.layer or "").strip().lower() not in wanted:
+                    continue
+                out.msp.add_foreign_entity(ve, copy=False)
+                _fix_hatch_pattern(ve)
+                nested += 1
+            except Exception:
+                skipped += 1
+
+    for e in doc.modelspace():
+        if e.dxftype() == "INSERT" and id(e) not in kept_ids:
+            explode(e, set())
+
+    if skipped:
+        result.warn(f"{skipped} nested wall entities of unsupported types "
+                    f"could not be copied")
+    if verbatim == 0 and nested == 0:
+        result.warn("wall_frame layers configured but no entities found "
+                    "(top level or inside blocks)")
+
+
+def _fix_hatch_pattern(entity) -> None:
+    """Rebuild a copied HATCH's pattern definition from its own name/scale/
+    angle so the block-explode→copy chain doesn't re-scale it.  Unknown
+    pattern names keep their copied definition untouched."""
+    try:
+        if entity is None or entity.dxftype() != "HATCH" or entity.dxf.solid_fill:
+            return
+        name = entity.dxf.pattern_name
+        if not name or name.upper() == "SOLID":
+            return
+        entity.set_pattern_fill(
+            name, scale=float(entity.dxf.pattern_scale or 1.0),
+            angle=float(entity.dxf.pattern_angle or 0.0),
+            color=entity.dxf.color)
+    except Exception:
+        pass
 
 
 def mm2_to_m2(v: float) -> float:

@@ -35,7 +35,7 @@ def build_store_dxf(path: str) -> None:
     bottom-middle, a fixture block placed straight and mirrored."""
     doc = ezdxf.new("R2010")
     for name, color in [("STORE-EDGE", 7), ("WALLS", 1), ("ZONE-A", 3),
-                        ("FIX-LAYER", 4), ("TXT", 2)]:
+                        ("FIX-LAYER", 4), ("TXT", 2), ("PARTITION-X", 6)]:
         doc.layers.add(name, color=color)
     msp = doc.modelspace()
     msp.add_lwpolyline([(0, 0), (STORE_W, 0), (STORE_W, STORE_H),
@@ -65,6 +65,13 @@ def build_store_dxf(path: str) -> None:
     # room label for balloon detection
     t = msp.add_text("PANTRY", dxfattribs={"layer": "TXT", "height": 200})
     t.set_placement((2500, 10000))
+    # a cabin bounded ONLY by PARTITION-X (a layer deliberately NOT in the
+    # test config's global walls list), with its own text label
+    msp.add_lwpolyline([(16000, 8000), (19000, 8000), (19000, 11000),
+                        (16000, 11000)], close=True,
+                       dxfattribs={"layer": "PARTITION-X"})
+    t2 = msp.add_text("CABIN", dxfattribs={"layer": "TXT", "height": 200})
+    t2.set_placement((17500, 9500))
     doc.saveas(path)
 
 
@@ -377,6 +384,40 @@ class TestDockets(PipelineTestCase):
         boq = result["boq_summary"]["skirting"]
         self.assertGreaterEqual(boq["total_length_m"], 3.9)
         self.assertEqual(boq["height_mm"], 100)
+
+    def test_skirting_blank_rooms_means_all_zones(self):
+        """Empty rooms list → every catalog zone is skirted; a fixture-block
+        zone in open floor contributes nothing."""
+        result = self.run_dockets({
+            "skirting": {"rooms": [], "height_mm": 100, "exclude": []}})
+        self.assertTrue(result["ok"], result)
+        boq = result["boq_summary"]["skirting"]
+        room_names = [r["room"] for r in boq["rooms"]]
+        self.assertIn("zone_a", room_names)
+        self.assertNotIn("fixtures", room_names)  # no wall behind it
+        self.assertGreaterEqual(boq["total_length_m"], 3.9)
+
+    def test_skirting_uses_balloon_barriers_as_walls(self):
+        """A balloon zone's own barrier layers count as walls for its
+        skirting even when they are missing from the global walls list."""
+        result = self.run_dockets({
+            "zones": {"cabin": {"kind": "balloon", "keywords": ["CABIN"],
+                                "text_layers": None,
+                                "barrier_layers": ["PARTITION-X"]}},
+            "skirting": {"rooms": [{"$ref": "#/zones/cabin"}],
+                         "height_mm": 100, "exclude": []}})
+        self.assertTrue(result["ok"], result)
+        boq = result["boq_summary"]["skirting"]
+        # cabin is 3 m × 3 m -> perimeter ~12 m, all on PARTITION-X
+        self.assertGreaterEqual(boq["total_length_m"], 8.0, boq)
+
+    def test_skirting_exclude_drops_zone_entirely(self):
+        result = self.run_dockets({
+            "skirting": {"rooms": [], "height_mm": 100,
+                         "exclude": [{"$ref": "#/zones/zone_a"}]}})
+        self.assertTrue(result["ok"], result)
+        boq = result["boq_summary"]["skirting"]
+        self.assertNotIn("zone_a", [r["room"] for r in boq["rooms"]])
 
     def test_end_to_end_all_dockets(self):
         result = self.run_dockets({

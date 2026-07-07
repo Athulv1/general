@@ -287,13 +287,13 @@
       <div id="skirtingBody" style="display:none">
         <div class="gap"></div>
         <div class="flex">
-          <div style="flex:2"><label>Rooms / zones to skirt — pick zones</label><div class="tags skr-zones" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a zone…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div></div>
+          <div style="flex:2"><label>Rooms / zones to skirt — blank = every zone from Step 3</label><div class="tags skr-zones" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="blank = all zones, or pick specific ones…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div></div>
           <div><label>Skirting height (mm)</label><input type="number" id="skr-height" min="0" value="100" oninput="render()"></div>
         </div>
         <div class="gap"></div>
         <label>Exclude — rooms / areas that get no skirting (pick zones, or block / layer names)</label>
         <div class="tags skr-exclude" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a zone / block / layer…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
-        <div class="hint">Skirting normally follows the tiled / floored rooms. Leave the top field empty to skip skirting entirely.</div>
+        <div class="hint">Skirting runs along real walls only and skips door openings (set your door layers in the Walls section below). Zones in the exclude list get no skirting at all.</div>
       </div>
     </div>
 
@@ -303,6 +303,9 @@
       <p class="desc">The output is clean — walls + flooring + speakers only (furniture, fixtures and dimensions are not copied). List the structural layers to copy into the output as the wall frame: walls, partitions, columns, beams, glazing.</p>
       <div id="keeps"></div>
       <button class="add" onclick="addKeep()">+ Add wall layer</button>
+      <div class="gap"></div>
+      <label>Door / opening layers — optional. Doors and openings drawn on these layers are treated as gaps: no skirting or wall finish runs across them.</label>
+      <div class="tags door-layers" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-all" placeholder="type or pick a door layer…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
     </div>
   </div>
 
@@ -739,6 +742,8 @@ function buildConfig(){
     default_flooring_type:document.getElementById("defaultType").value||null,
     flooring:{store_outline:{layers:store?[store]:[]},zones:fzones,wall_frame:{mirror_layers:keeps,hatch_layers:[]}}
   };
+  const doorLayers=tagValues(document.querySelector(".door-layers"));
+  if(doorLayers.length) cfg.walls={door_layers:doorLayers};
 
   // speaker docket (optional) — two modes: auto-by-coverage OR manual placement
   if(document.getElementById("spEnabled").checked){

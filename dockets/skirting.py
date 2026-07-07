@@ -1,15 +1,15 @@
-"""Skirting docket — base strip along the walls of chosen rooms.
+"""Skirting docket — base strip around each room's perimeter.
 
-Path per room: the room-boundary portions on configured walls
-(``boundary_on_walls``: door openings drop out where walls have gaps, and
-segments on the configured door layers are subtracted), minus any exclusion
-zones / layer geometry.  Measured in running metres; rooms list blank →
-docket produces nothing (per the intake form's note).
+Path per room: the ENTIRE room-outline perimeter (the outline is the wall
+line) minus door openings (segments on the configured door layers) and minus
+any excluded zones / layer / block geometry.  Measured in running metres.
+Rooms list blank → skirt every zone in the shared catalog.
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from shapely.geometry import LineString
 from shapely.ops import unary_union
 
 from dockets.base import (Ctx, DocketResult, Out, add_line_geom, add_text,
@@ -17,6 +17,7 @@ from dockets.base import (Ctx, DocketResult, Out, add_line_geom, add_text,
 import config_loader
 
 _EXCLUDE_BUFFER_MM = 100.0  # tolerance around excluded geometry
+_DOOR_BUFFER_MM = 100.0     # tolerance around door/opening segments
 
 
 def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
@@ -26,10 +27,28 @@ def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
                    or config_loader.DEFAULTS["skirting"]["height_mm"])
     rooms = docket_cfg.get("rooms") or []
     if not rooms:
-        result.warn("skirting.rooms is empty — nothing to skirt")
-        result.boq = {"rooms": [], "total_length_m": 0.0,
-                      "height_mm": height}
-        return result
+        # blank rooms list = skirt every ROOM-like zone from the shared
+        # catalog (polyline outlines + balloon rooms).  Block zones are
+        # fixtures/objects, not rooms, so they are not auto-skirted; list a
+        # block zone explicitly if you really want a skirt around it.
+        rooms = [z for z in (ctx.cfg.get("zones") or {}).values()
+                 if isinstance(z, dict) and z.get("kind") in ("polyline",
+                                                              "balloon")]
+        if not rooms:
+            result.warn("no zones defined — nothing to skirt")
+            result.boq = {"rooms": [], "total_length_m": 0.0,
+                          "height_mm": height}
+            return result
+
+    # zones named in the exclude list get NO skirting at all (and their
+    # geometry is also subtracted from every other room's path below)
+    excluded_names = {e.get("zone_name")
+                      for e in docket_cfg.get("exclude") or []
+                      if isinstance(e, dict) and e.get("zone_name")}
+    if excluded_names:
+        rooms = [r for r in rooms
+                 if not (isinstance(r, dict)
+                         and r.get("zone_name") in excluded_names)]
 
     # ── exclusion geometry (zones, layers or blocks) ───────────────────────
     exclude_geoms = []
@@ -50,10 +69,18 @@ def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
             result.warn(f"skirting.exclude[{i}] resolved to no geometry")
     exclusion = unary_union(exclude_geoms) if exclude_geoms else None
 
+    # Door openings: buffers around segments on the configured door layers,
+    # so skirting drops out wherever a door/opening crosses a room wall.
+    door_segs = ctx.door_segments
+    door_geom = (unary_union([s.buffer(_DOOR_BUFFER_MM, cap_style=2)
+                              for s in door_segs]) if door_segs else None)
+    if door_segs:
+        result.warn(f"door openings: {len(door_segs)} segment(s) on the "
+                    f"configured door layers will be skipped")
+
     layer = out.layer("skirting")
     rooms_boq: List[Dict[str, Any]] = []
     total_mm = 0.0
-    from dockets.base import boundary_on_walls  # local import avoids cycle
     for i, room_def in enumerate(rooms):
         polys = ctx.resolver.resolve(room_def)
         if not polys:
@@ -64,8 +91,17 @@ def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
         room_mm = 0.0
         tag_pos = None
         for poly in iter_polys(union_polys(polys)):
-            path = boundary_on_walls(ctx, poly, result,
-                                     extra_subtract=exclusion)
+            # Skirting runs along the ENTIRE room perimeter (the room outline
+            # IS the wall line) minus door openings and excluded areas.  No
+            # wall-layer intersection — that dropped edges when the outline
+            # didn't sit exactly on a separate wall layer.
+            path = LineString(poly.exterior.coords)
+            for ring in poly.interiors:
+                path = path.union(LineString(ring.coords))
+            if door_geom is not None:
+                path = path.difference(door_geom)
+            if exclusion is not None:
+                path = path.difference(exclusion)
             if path.is_empty:
                 continue
             room_mm += geom_length(path)
@@ -75,7 +111,7 @@ def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
                 mid = first.interpolate(0.5, normalized=True)
                 tag_pos = (mid.x, mid.y + 120.0)
         if room_mm <= 0:
-            result.warn(f"skirting.rooms[{i}] ('{name}') has no wall length "
+            result.warn(f"skirting.rooms[{i}] ('{name}') has no perimeter "
                         f"to skirt")
             continue
         if tag_pos is not None:

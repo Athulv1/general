@@ -25,7 +25,7 @@ import config_loader
 from config_loader import ConfigError
 from zone_service import ZoneResolver
 from dockets import ENGINES
-from dockets.base import Ctx, DocketResult, Out
+from dockets.base import Ctx, DocketResult, Out, import_wall_frame
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +89,12 @@ def run(config_path: Optional[str] = None,
             dres = DocketResult(name).fail(
                 f"engine crashed: {exc.__class__.__name__}: {exc}")
             log.error("engine %s crashed:\n%s", name, traceback.format_exc())
+        # every docket output shows the walls for context (config-driven)
+        if dres.ok:
+            try:
+                import_wall_frame(doc, ctx, out, dres)
+            except Exception as exc:
+                dres.warn(f"wall frame import failed: {exc}")
         dres.dxf_entities_written = len(out.msp)
         dxf_file = None
         if dres.ok:
