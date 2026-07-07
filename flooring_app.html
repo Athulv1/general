@@ -88,7 +88,7 @@
       <div class="step">STEP 2</div>
       <h2>Store outline <span class="req">REQUIRED</span></h2>
       <p class="desc">Layer holding one closed shape around the whole floor.</p>
-      <input type="text" id="storeLayer" data-combo="dl-closed" placeholder="e.g. PLANO-CARPET" oninput="render()">
+      <input type="text" id="storeLayer" data-combo="dl-closed" placeholder="upload a DXF, then pick the store outline layer" oninput="render()">
     </div>
 
     <!-- STEP 3: zones (shared catalog) -->
@@ -466,7 +466,7 @@ function addZone(name="",ident="polyline",d={}){
       </select></div>
     </div>
     <div class="gap"></div>
-    <div class="z-poly"><label>Layer</label><input class="z-layer" data-combo="dl-closed" value="${esc(d.layer||'')}" placeholder="e.g. PLANO-ZONE / FOH_ZONE_OUTLINE" oninput="render()"></div>
+    <div class="z-poly"><label>Layer</label><input class="z-layer" data-combo="dl-closed" value="${esc(d.layer||'')}" placeholder="pick a layer from your drawing" oninput="render()"></div>
     <div class="z-block" style="display:none"><label>Block name</label><input class="z-blockname" data-combo="dl-blocks" value="${esc(d.blockname||'')}" oninput="render()"></div>
     <div class="z-balloon" style="display:none">
       <div class="flex">
@@ -871,7 +871,7 @@ function buildConfig(){
 }
 function addKeep(layer=""){
   const d=document.createElement("div"); d.className="flex"; d.style.marginBottom="8px";
-  d.innerHTML=`<div><input class="k-layer" data-combo="dl-all" value="${esc(layer)}" placeholder="e.g. A-WALL HATCH" oninput="render()"></div>
+  d.innerHTML=`<div><input class="k-layer" data-combo="dl-all" value="${esc(layer)}" placeholder="pick a wall layer from your drawing" oninput="render()"></div>
     <button class="rm" onclick="this.parentElement.remove();render()">✕</button>`;
   document.getElementById("keeps").appendChild(d); render();
 }
@@ -924,42 +924,15 @@ async function generate(){
 function copyJson(){navigator.clipboard.writeText(JSON.stringify(buildConfig(),null,2));}
 function downloadCfg(){const b=new Blob([JSON.stringify(buildConfig(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="layout_config.json";a.click();URL.revokeObjectURL(a.href);}
 
-// ── seed ──
-addZone("Toilet","balloon",{keyword:"TOILET",boundaries:["A-WALL","LK-PARTITION"]});
-addZone("FOH","polyline",{layer:"FOH_ZONE_OUTLINE"});
-addZone("PickupTable","balloon",{keyword:"PICKUP"});
+// ── initial state ──────────────────────────────────────────────
+// The form starts EMPTY: every layer, block, room name and zone comes from
+// the customer's uploaded DXF — nothing drawing-specific is pre-filled.
+// The two starter flooring types are engineering defaults only (a 600 mm
+// tile and a skip), with no layer names attached.
 addFType("GreyTile","tile",{length_mm:600,width_mm:600,rotation_deg:45});
 addFType("NoFloor","skip");
-addFAssign("Toilet","NoFloor");
-addSPlace("FOH","corners","");
-addSPlace("Toilet","center","1");
-addSBox("PickupTable","center","1");
-tagSeed(document.querySelector(".sk-rooms"), "Toilet, Clinic1");
-addZone("Sales","polyline",{layer:"PLANO-ZONE"});
-addZone("Storage","polyline",{layer:"STORAGE_AREA_OUTLINE"});
-["A-WALL","A-COL","A-BEAM PLAN"].forEach(l=>addPLayer("structural",l));
-["LK-PARTITION","I-LK CURTAIN","A-SHUTTER"].forEach(l=>addPLayer("partitions",l));
-addPLayer("text","LK-ROOM TAG");
-addPStyle("Storage",1,50,true);
-addPStyle("Sales",3,35,false);
-// finishes seed (adds BOH + Clinic1 shared zones)
-addZone("BOH","polyline",{layer:"BOH_ZONE_1_OUTLINE"});
-addZone("Clinic1","polyline",{layer:"CLINIC_1_OUTLINE"});
-addFinish("Paint","BOH, PickupTable","2400","5");
-addFinish("Tile","Clinic1","2100","6");
-addFinish("Fluting","FOH","2400","40");
-addFinish("Mirror","LK-MIRROR","2325","133");
-addFinish("Laminate","FACADE-LAMINATE","1000","3");
-addFinish("ACP","FACADE-ACP","1000","1");
-tagSeed(document.querySelector(".skr-zones"), "FOH, Clinic1");
-tagSeed(document.querySelector(".skr-exclude"), "Toilet");
-// electrical seed
-addELGroup("JJ_FIXTURE_, VC_FIXTURE_, MIRROR_","wall","WP1","6A RAW POINT @2250MM");
-addELGroup("SCREEN_55, NEON_LIGHT_BOX","ceiling","CP4","2x 6/16A SOCKET + CAT6 IN CEILING");
-addELGroup("QMS_DESK, BILLING_COUNTER, STANDING_TABLE","floor","FP2","6/16A RAW IN FLOOR");
-addELGroup("PICKUP_TABLE","data","CT1","3-CONDUIT FLOOR BOX (DATA/UPS/16A)");
-addELGroup("GAS_POINT","other","GP1","1/2\" GAS CONNECTION","Gas point");
-["A-WALL HATCH","A-WALL","LK-PARTITION","A-COL","A-COL HATCH","A-BEAM PLAN","A-GLAZING","A-SHUTTER","A-GLASS DOOR"].forEach(addKeep);
+addZone();      // one blank zone row, ready to fill from the DXF dropdowns
+addKeep();      // one blank wall-layer row
 render();
 </script>
 </body>
