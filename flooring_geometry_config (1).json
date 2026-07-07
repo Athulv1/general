@@ -1,0 +1,72 @@
+{
+  "schema_version": "2.0",
+  "units": "mm",
+
+  "_comment": "Minimal, generalised flooring config. Customer only fills in layer names. Logic: floor the whole store_outline; for every zone_outline apply its rule -> action 'skip' leaves that region empty, action 'floor' (default) tiles it. If no zones are found, the complete store is floored.",
+
+  "io": {
+    "input_dxf": "",
+    "output_dxf": "",
+    "ctx_file": "context.ctx"
+  },
+
+  "params": {
+    "tile_size_mm": 600,
+    "tile_rotation_deg": 45,
+    "wastage_pct": 10,
+    "min_door_width_mm": 600
+  },
+
+  "flooring": {
+    "docket": "flooring",
+
+    "store_outline": {
+      "dxf_types": ["LWPOLYLINE", "POLYLINE"],
+      "layers": ["PLANO-CARPET"],
+      "layer_pattern": null,
+      "role": "site_boundary",
+      "cardinality": "single",
+      "required": true
+    },
+
+    "wall_frame": {
+      "_comment": "Wall cross-section copied verbatim from the source DXF into the output. Name the customer's wall + wall-hatch + partition layers here (any names). mirror_layers = copied whole (HATCH fill + outlines). hatch_layers = extra HATCH/outline-only layers. Set mirror_layers to [] to omit walls entirely.",
+      "mirror_layers": ["A-WALL HATCH", "A-WALL", "LK-PARTITION"],
+      "hatch_layers": ["HATCH_OUTLINE", "I-LK CURTAIN"]
+    },
+
+    "exclude_rooms": {
+      "_comment": "Remove flooring from rooms identified by a TEXT LABEL (not a closed polygon). The balloon method seeds from the matching text and inflates to the surrounding walls. Use this for toilets/rooms that have a name tag but no drawn boundary. text_layers = layers carrying the room labels (null = search all). keywords = room words to remove.",
+      "text_layers": ["LK-ROOM TAG", "PLANO-TXT", "LK-TEXT"],
+      "keywords": ["TOILET", "WASHROOM", "WC", "REST ROOM", "RESTROOM"]
+    },
+
+    "zone_outlines": [
+      {
+        "id": "NO-FLOOR",
+        "dxf_types": ["LWPOLYLINE", "POLYLINE"],
+        "layers": ["PLANO-NOFLOOR"],
+        "layer_pattern": null,
+        "role": "exclude_region",
+        "action": "skip",
+        "start_point": null
+      },
+      {
+        "id": "TILED-ZONE",
+        "dxf_types": ["LWPOLYLINE", "POLYLINE"],
+        "layers": ["PLANO-ZONE"],
+        "layer_pattern": null,
+        "role": "tiling_region",
+        "action": "floor",
+        "start_point": {
+          "dxf_types": ["INSERT", "POINT"],
+          "layers": ["PLANO-START"],
+          "layer_pattern": null,
+          "scope": "global",
+          "role": "tiling_origin",
+          "required": false
+        }
+      }
+    ]
+  }
+}

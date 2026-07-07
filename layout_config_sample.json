@@ -1,0 +1,125 @@
+{
+  "schema_version": "3.1",
+  "units": "mm",
+  "_comment": "$ref: a {\"$ref\": \"#/zones/<name>\"} node resolves to that entry in the shared 'zones' catalog; sibling keys override. Zones are defined once and reused by flooring + speaker so the config never duplicates a region.",
+
+  "io": {
+    "input_dxf": "",
+    "output_dxf": "",
+    "ctx_file": "context.ctx"
+  },
+
+  "zones": {
+    "Toilet":     { "identifier": "balloon",  "keyword": "TOILET", "text_layer": "LK-ROOM TAG", "boundaries": ["A-WALL", "LK-PARTITION"] },
+    "FOH":        { "identifier": "polyline", "layer": "FOH_ZONE_OUTLINE" },
+    "Stockroom":  { "identifier": "balloon",  "keyword": "STOCK" },
+    "Sales":      { "identifier": "polyline", "layer": "PLANO-ZONE" },
+    "PickupTable":{ "identifier": "balloon",  "keyword": "PICKUP" },
+    "Storage":    { "identifier": "polyline", "layer": "STORAGE_AREA_OUTLINE" },
+    "BOH":        { "identifier": "polyline", "layer": "BOH_ZONE_1_OUTLINE" },
+    "Clinic1":    { "identifier": "polyline", "layer": "CLINIC_1_OUTLINE" }
+  },
+
+  "flooring_types": [
+    { "name": "GreyTile", "kind": "tile", "length_mm": 600, "width_mm": 600, "rotation_deg": 45 },
+    { "name": "NoFloor",  "kind": "skip" }
+  ],
+  "default_flooring_type": "GreyTile",
+
+  "flooring": {
+    "store_outline": { "layers": ["PLANO-CARPET"] },
+    "zones": [
+      { "zone": { "$ref": "#/zones/Toilet" }, "flooring_type": "NoFloor" },
+      { "zone": { "$ref": "#/zones/Sales" },  "flooring_type": "GreyTile" }
+    ],
+    "wall_frame": {
+      "mirror_layers": ["A-WALL HATCH", "A-WALL", "LK-PARTITION", "A-COL", "A-COL HATCH", "A-BEAM PLAN", "A-GLAZING", "A-SHUTTER", "A-GLASS DOOR"],
+      "hatch_layers": []
+    }
+  },
+
+  "speaker": {
+    "docket": "speaker",
+    "enabled": true,
+    "mode": "placement",
+    "model": {
+      "speaker_size_mm": 300,
+      "coverage_radius_mm": 4000,
+      "box_width_mm": 400,
+      "box_height_mm": 200
+    },
+    "placements": [
+      { "target": { "$ref": "#/zones/FOH" },       "position": "corners", "count": null },
+      { "target": { "$ref": "#/zones/Toilet" },    "position": "center",  "count": 1 },
+      { "target": { "$ref": "#/zones/Stockroom" }, "position": "center",  "count": 1 },
+      { "target": "store",                          "position": "auto",    "count": null }
+    ],
+    "boxes": [
+      { "target": { "$ref": "#/zones/PickupTable" }, "position": "center", "count": 1 }
+    ]
+  },
+
+  "sprinkler": {
+    "docket": "sprinkler",
+    "enabled": true,
+    "model": {
+      "coverage_radius_mm": 2300,
+      "max_spacing_mm": 3700,
+      "pattern": "square",
+      "coverage": "full"
+    },
+    "target": "store",
+    "min_one_per_room": true,
+    "rooms": [ { "$ref": "#/zones/Toilet" }, { "$ref": "#/zones/Clinic1" } ]
+  },
+
+  "partition": {
+    "docket": "partition",
+    "enabled": true,
+    "keep": {
+      "boundary":   ["PLANO-CARPET", "LEASE_LINE"],
+      "structural": ["A-WALL", "A-COL", "A-BEAM PLAN"],
+      "partitions": ["LK-PARTITION", "I-LK CURTAIN", "A-SHUTTER"],
+      "text":       ["LK-ROOM TAG"]
+    },
+    "style": [
+      { "zone": { "$ref": "#/zones/Storage" }, "color_aci": 1, "lineweight": 50, "label_area": true },
+      { "zone": { "$ref": "#/zones/Sales" },   "color_aci": 3, "lineweight": 35, "label_area": false }
+    ],
+    "label_layer": "SYSTEM_LABELS"
+  },
+
+  "electrical": {
+    "docket": "electrical",
+    "enabled": true,
+    "groups": [
+      { "match": ["JJ_FIXTURE_", "VC_FIXTURE_", "MIRROR_"],      "place": "wall",    "label": "WP1", "note": "6A RAW POINT @2250MM" },
+      { "match": ["SCREEN_55", "NEON_LIGHT_BOX"],                "place": "ceiling", "label": "CP4", "note": "2x 6/16A SOCKET + CAT6 IN CEILING" },
+      { "match": ["QMS_DESK", "BILLING_COUNTER", "STANDING_TABLE"], "place": "floor", "label": "FP2", "note": "6/16A RAW IN FLOOR" },
+      { "match": ["PICKUP_TABLE"],                               "place": "data",    "label": "CT1", "note": "3-CONDUIT FLOOR BOX (DATA/UPS/16A)" },
+      { "match": ["GAS_POINT"],                                  "place": "Gas point", "label": "GP1", "note": "1/2\" GAS CONNECTION" }
+    ]
+  },
+
+  "finishes": {
+    "docket": "finishes",
+    "enabled": true,
+    "materials": [
+      { "name": "Paint",    "applies_to": [ {"$ref":"#/zones/BOH"}, {"$ref":"#/zones/PickupTable"} ], "height_mm": 2400, "color_aci": 5 },
+      { "name": "Tile",     "applies_to": [ {"$ref":"#/zones/Clinic1"} ],                             "height_mm": 2100, "color_aci": 6 },
+      { "name": "Fluting",  "applies_to": [ {"$ref":"#/zones/FOH"} ],                                 "height_mm": 2400, "color_aci": 40 },
+      { "name": "Mirror",   "applies_to": [ "LK-MIRROR" ],                                            "height_mm": 2325, "color_aci": 133 },
+      { "name": "Laminate", "applies_to": [ "FACADE-LAMINATE" ],                                      "height_mm": 1000, "color_aci": 3 },
+      { "name": "ACP",      "applies_to": [ "FACADE-ACP" ],                                           "height_mm": 1000, "color_aci": 1 }
+    ]
+  },
+
+  "skirting": {
+    "docket": "skirting",
+    "enabled": true,
+    "zones": [ { "$ref": "#/zones/FOH" }, { "$ref": "#/zones/Clinic1" } ],
+    "exclude": [ { "$ref": "#/zones/Toilet" } ],
+    "height_mm": 100,
+    "measure": "length"
+  }
+}

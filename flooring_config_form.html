@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flooring Layout — Config Builder</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1e222e; --line:#2a2f3d;
+    --text:#e6e8ee; --muted:#9aa3b2; --accent:#4f8cff; --accent2:#2bd4a4;
+    --danger:#ff5d6c; --chip:#262b38;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  .wrap{display:grid;grid-template-columns:1fr 460px;gap:0;min-height:100vh}
+  @media(max-width:980px){.wrap{grid-template-columns:1fr}}
+  .form{padding:28px 32px;overflow-y:auto}
+  .preview{background:var(--panel);border-left:1px solid var(--line);padding:22px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 24px;font-size:13px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+  .card .desc{color:var(--muted);font-size:12px;margin:0 0 14px}
+  .req{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 7px;border-radius:20px;letter-spacing:.04em}
+  .opt{font-size:10px;font-weight:700;background:var(--chip);color:var(--muted);padding:2px 7px;border-radius:20px}
+  label{display:block;font-size:12px;color:var(--muted);margin:0 0 5px}
+  input[type=text],input[type=number],select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 11px;font-size:13px;outline:none}
+  input:focus,select:focus{border-color:var(--accent)}
+  .row{display:flex;gap:10px;margin-bottom:10px}
+  .row>div{flex:1}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .zone,.wallrow{display:flex;gap:10px;align-items:flex-end;margin-bottom:10px;background:var(--panel2);padding:10px;border-radius:8px;border:1px solid var(--line)}
+  .zone>div,.wallrow>div{flex:1}
+  button{cursor:pointer;font-family:inherit}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600}
+  .btn.alt{background:var(--chip);color:var(--text);border:1px solid var(--line)}
+  .btn.full{width:100%}
+  .add{background:transparent;border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600}
+  .rm{background:transparent;border:1px solid var(--line);color:var(--danger);border-radius:8px;padding:9px 11px;font-size:13px;height:38px}
+  .switch{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .switch input{width:auto}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12px;line-height:1.5;
+    overflow:auto;white-space:pre;color:#cdd6e4;max-height:calc(100vh - 160px)}
+  .preview h2{font-size:13px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .pbtns{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:11px;margin-top:6px}
+  .warn{color:var(--danger);font-size:12px;margin-top:8px;display:none}
+  .ok{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ───────── FORM ───────── -->
+  <div class="form">
+    <h1>Flooring Layout — Config Builder</h1>
+    <p class="sub">Enter your DXF layer names. Only the store outline is required — everything else is optional.</p>
+
+    <!-- 1. Store outline -->
+    <div class="card">
+      <h2>1. Store outline <span class="req">REQUIRED</span></h2>
+      <p class="desc">The layer that holds <b>one closed shape</b> around the whole floor area to be tiled.</p>
+      <label>Store outline layer name</label>
+      <input type="text" id="storeLayer" placeholder="e.g. PLANO-CARPET" oninput="render()">
+      <div class="hint">Must be a closed polyline/polygon. An open line will not work.</div>
+      <div class="warn" id="storeWarn">⚠ Store outline layer is required.</div>
+    </div>
+
+    <!-- 2. No-floor zones -->
+    <div class="card">
+      <h2>2. No-floor areas <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Closed shapes around rooms to leave <b>empty</b> (toilet, store room, staff area). Add one row per layer.</p>
+      <div id="zones"></div>
+      <button class="add" onclick="addZone()">+ Add no-floor area</button>
+    </div>
+
+    <!-- 3. Walls -->
+    <div class="card">
+      <h2>3. Walls <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Wall / wall-hatch layers to copy into the output for context. Toggle off to omit walls.</p>
+      <div class="switch"><input type="checkbox" id="showWalls" checked onchange="render()"><label style="margin:0">Show walls in output</label></div>
+      <div id="walls"></div>
+      <button class="add" onclick="addWall()">+ Add wall layer</button>
+    </div>
+
+    <!-- 4. Start point -->
+    <div class="card">
+      <h2>4. Tile start point <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">A layer with one POINT or block marking where tiling begins (usually the door). Leave blank to auto-detect.</p>
+      <label>Start point layer name</label>
+      <input type="text" id="startLayer" placeholder="e.g. PLANO-START" oninput="render()">
+    </div>
+
+    <!-- 5. Tile settings -->
+    <div class="card">
+      <h2>5. Tile settings</h2>
+      <p class="desc">How the tiles are laid and ordered.</p>
+      <div class="grid3">
+        <div><label>Tile size (mm)</label><input type="number" id="tileSize" value="600" oninput="render()"></div>
+        <div><label>Pattern</label>
+          <select id="pattern" onchange="render()">
+            <option value="45">Diamond (45°)</option>
+            <option value="0">Square (0°)</option>
+          </select>
+        </div>
+        <div><label>Wastage (%)</label><input type="number" id="wastage" value="10" oninput="render()"></div>
+      </div>
+    </div>
+
+    <!-- 6. Files -->
+    <div class="card">
+      <h2>6. Files <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Input DXF and output paths. Can also be passed on the command line instead.</p>
+      <label>Input DXF path</label>
+      <input type="text" id="inputDxf" placeholder="C:\path\to\drawing.dxf" oninput="render()">
+      <div style="height:10px"></div>
+      <label>Output DXF path (leave blank for default)</label>
+      <input type="text" id="outputDxf" placeholder="(auto)" oninput="render()">
+    </div>
+  </div>
+
+  <!-- ───────── PREVIEW ───────── -->
+  <div class="preview">
+    <h2>Generated config (JSON)</h2>
+    <div class="pbtns">
+      <button class="btn" onclick="download()">⬇ Download JSON</button>
+      <button class="btn alt" onclick="copyJson()">⧉ Copy</button>
+      <button class="btn alt" onclick="document.getElementById('loadFile').click()">↑ Load JSON</button>
+      <input type="file" id="loadFile" accept=".json" style="display:none" onchange="loadJson(event)">
+    </div>
+    <pre id="out"></pre>
+    <div class="hint" id="copied"></div>
+  </div>
+</div>
+
+<script>
+// ── dynamic rows ──────────────────────────────────────────────
+function addZone(id="", layer=""){
+  const d=document.createElement("div"); d.className="zone";
+  d.innerHTML=`
+    <div><label>Name</label><input type="text" class="z-id" placeholder="e.g. TOILET" value="${id}" oninput="render()"></div>
+    <div><label>Layer name</label><input type="text" class="z-layer" placeholder="e.g. PLANO-NOFLOOR" value="${layer}" oninput="render()"></div>
+    <button class="rm" onclick="this.parentElement.remove();render()">✕</button>`;
+  document.getElementById("zones").appendChild(d); render();
+}
+function addWall(layer=""){
+  const d=document.createElement("div"); d.className="wallrow";
+  d.innerHTML=`
+    <div><label>Wall layer name</label><input type="text" class="w-layer" placeholder="e.g. A-WALL HATCH" value="${layer}" oninput="render()"></div>
+    <button class="rm" onclick="this.parentElement.remove();render()">✕</button>`;
+  document.getElementById("walls").appendChild(d); render();
+}
+
+// ── build config object ───────────────────────────────────────
+function buildConfig(){
+  const store = document.getElementById("storeLayer").value.trim();
+  const startLayer = document.getElementById("startLayer").value.trim();
+  const showWalls = document.getElementById("showWalls").checked;
+
+  const zones=[];
+  document.querySelectorAll("#zones .zone").forEach((z,i)=>{
+    const id=(z.querySelector(".z-id").value.trim())||("NO-FLOOR-"+(i+1));
+    const layer=z.querySelector(".z-layer").value.trim();
+    if(layer) zones.push({
+      id, dxf_types:["LWPOLYLINE","POLYLINE"], layers:[layer], layer_pattern:null,
+      role:"exclude_region", action:"skip", start_point:null
+    });
+  });
+
+  const wallLayers=[];
+  document.querySelectorAll("#walls .w-layer").forEach(w=>{ const v=w.value.trim(); if(v) wallLayers.push(v); });
+
+  const cfg={
+    schema_version:"2.0",
+    units:"mm",
+    io:{
+      input_dxf:document.getElementById("inputDxf").value.trim(),
+      output_dxf:document.getElementById("outputDxf").value.trim(),
+      ctx_file:"context.ctx"
+    },
+    params:{
+      tile_size_mm:Number(document.getElementById("tileSize").value)||600,
+      tile_rotation_deg:Number(document.getElementById("pattern").value),
+      wastage_pct:Number(document.getElementById("wastage").value)||0,
+      min_door_width_mm:600
+    },
+    flooring:{
+      docket:"flooring",
+      store_outline:{
+        dxf_types:["LWPOLYLINE","POLYLINE"],
+        layers: store?[store]:[],
+        layer_pattern:null, role:"site_boundary", required:true
+      },
+      wall_frame:{
+        mirror_layers: showWalls?wallLayers:[],
+        hatch_layers:[]
+      },
+      zone_outlines: zones
+    }
+  };
+  if(startLayer){
+    cfg.flooring.start_point={
+      dxf_types:["INSERT","POINT"], layers:[startLayer], layer_pattern:null,
+      scope:"global", role:"tiling_origin", required:false
+    };
+  }
+  return cfg;
+}
+
+// ── render preview ────────────────────────────────────────────
+function render(){
+  const cfg=buildConfig();
+  document.getElementById("out").textContent=JSON.stringify(cfg,null,2);
+  document.getElementById("storeWarn").style.display = cfg.flooring.store_outline.layers.length?"none":"block";
+}
+
+// ── actions ───────────────────────────────────────────────────
+function download(){
+  const blob=new Blob([JSON.stringify(buildConfig(),null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="flooring_geometry_config.json"; a.click(); URL.revokeObjectURL(a.href);
+}
+function copyJson(){
+  navigator.clipboard.writeText(JSON.stringify(buildConfig(),null,2));
+  const c=document.getElementById("copied"); c.innerHTML='<span class="ok">✓ Copied to clipboard</span>';
+  setTimeout(()=>c.textContent="",2000);
+}
+function loadJson(ev){
+  const f=ev.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ applyConfig(JSON.parse(r.result)); }catch(e){ alert("Invalid JSON: "+e.message); } };
+  r.readAsText(f);
+}
+function applyConfig(cfg){
+  const fl=cfg.flooring||{};
+  document.getElementById("storeLayer").value=((fl.store_outline||{}).layers||[])[0]||"";
+  document.getElementById("inputDxf").value=(cfg.io||{}).input_dxf||"";
+  document.getElementById("outputDxf").value=(cfg.io||{}).output_dxf||"";
+  const p=cfg.params||{};
+  document.getElementById("tileSize").value=p.tile_size_mm??600;
+  document.getElementById("wastage").value=p.wastage_pct??10;
+  document.getElementById("pattern").value=String(p.tile_rotation_deg??45)==="0"?"0":"45";
+  // start point
+  const sp=fl.start_point||(((fl.zone_outlines||[]).find(z=>z.start_point)||{}).start_point);
+  document.getElementById("startLayer").value=sp?(sp.layers||[])[0]||"":"";
+  // walls
+  document.getElementById("walls").innerHTML="";
+  const wl=(fl.wall_frame||{}).mirror_layers||[];
+  document.getElementById("showWalls").checked=wl.length>0;
+  wl.forEach(addWall);
+  // zones (skip only)
+  document.getElementById("zones").innerHTML="";
+  (fl.zone_outlines||[]).filter(z=>(z.action||"")==="skip"||z.role==="exclude_region")
+    .forEach(z=>addZone(z.id||"",(z.layers||[])[0]||""));
+  render();
+}
+
+// ── seed with the working example ─────────────────────────────
+addZone("TOILET","PLANO-NOFLOOR");
+addWall("A-WALL HATCH"); addWall("A-WALL"); addWall("LK-PARTITION");
+document.getElementById("storeLayer").value="PLANO-CARPET";
+render();
+</script>
+</body>
+</html>

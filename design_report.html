@@ -1,0 +1,375 @@
+<title>DXF Layout Engine — Configuration Architecture</title>
+<meta name="description" content="How the multi-docket, config-driven DXF layout generator is designed: one shared form and JSON drive flooring, speaker, sprinkler, partition and electrical drawings.">
+<style>
+  :root{
+    --paper:#f6f7f9; --panel:#ffffff; --ink:#13171e; --muted:#5a6472; --faint:#8893a3;
+    --line:#dde2ea; --grid:#e7ebf1; --blue:#2f6df0; --blue-deep:#1e4fc4; --blue-wash:#eef3fe;
+    --code-bg:#10151c; --code-ink:#cdd6e4; --code-key:#7fb0ff; --code-str:#5fd0a6; --code-dim:#6b7689;
+    --c-floor:#c9821f; --c-speaker:#7c5cdb; --c-sprinkler:#1592a6; --c-partition:#349a59; --c-electrical:#d3452f;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .doc{max-width:920px;margin:0 auto;padding:0 28px}
+  p{margin:0 0 1em;max-width:68ch}
+  h2{font-size:clamp(1.4rem,3vw,1.85rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 .2em;text-wrap:balance}
+  h3{font-size:1.08rem;letter-spacing:-.01em;margin:1.8em 0 .5em}
+  a{color:var(--blue-deep)}
+  code{font-family:var(--mono);font-size:.88em;background:#eceff4;border:1px solid var(--line);
+    border-radius:4px;padding:.05em .35em}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--blue);margin:0 0 .9em}
+
+  /* ── masthead ── */
+  .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line);
+    background:var(--panel);
+    background-image:
+      repeating-linear-gradient(0deg,transparent,transparent 31px,var(--grid) 31px,var(--grid) 32px),
+      repeating-linear-gradient(90deg,transparent,transparent 31px,var(--grid) 31px,var(--grid) 32px);}
+  .hero-inner{max-width:920px;margin:0 auto;padding:64px 28px 52px}
+  .hero h1{font-size:clamp(2rem,5.4vw,3.3rem);line-height:1.04;letter-spacing:-.03em;
+    margin:.25em 0 .35em;max-width:18ch;text-wrap:balance}
+  .hero .lede{font-size:1.12rem;color:var(--muted);max-width:60ch}
+  .tag{display:inline-flex;gap:.5em;align-items:center;font-family:var(--mono);font-size:.72rem;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:.3em .8em}
+  .tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:1.5em}
+
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:0}
+
+  /* ── pipeline diagram ── */
+  .flow-wrap{overflow-x:auto;padding-bottom:6px}
+  .flow{display:flex;align-items:stretch;gap:0;min-width:680px}
+  .stage{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 16px 18px}
+  .stage .n{font-family:var(--mono);font-size:.7rem;color:var(--blue);letter-spacing:.1em}
+  .stage b{display:block;font-size:1rem;margin:.25em 0 .3em}
+  .stage span{font-size:.85rem;color:var(--muted);line-height:1.45;display:block}
+  .arrow{flex:0 0 34px;display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:1.3rem}
+
+  /* ── zones / ref ── */
+  .splitcols{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+  @media(max-width:720px){.splitcols{grid-template-columns:1fr}}
+
+  pre{background:var(--code-bg);color:var(--code-ink);font-family:var(--mono);font-size:.82rem;
+    line-height:1.6;border-radius:9px;padding:18px 20px;overflow-x:auto;margin:0 0 1em;
+    border:1px solid #1d2530}
+  pre .k{color:var(--code-key)} pre .s{color:var(--code-str)} pre .c{color:var(--code-dim)}
+  pre .ref{color:#ffd479}
+
+  /* ── tables ── */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:560px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;background:var(--paper)}
+  tr:last-child td{border-bottom:0}
+  td code{font-size:.82em}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.5em;vertical-align:middle}
+  .num{font-variant-numeric:tabular-nums;color:var(--faint);font-family:var(--mono)}
+
+  /* ── docket blocks ── */
+  .docket{padding-top:30px}
+  .docket-head{display:flex;align-items:baseline;gap:.6em;margin-bottom:.1em}
+  .docket-head h3{margin:0;font-size:1.18rem}
+  .docket-head .role{font-size:.85rem;color:var(--muted)}
+  .chip{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+    padding:.25em .6em;border-radius:5px;color:#fff;font-weight:600}
+
+  /* ── what/how ── */
+  .wh{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:9px;overflow:hidden;background:var(--panel)}
+  @media(max-width:720px){.wh{grid-template-columns:1fr}}
+  .wh>div{padding:18px 20px}
+  .wh>div:first-child{border-right:1px solid var(--line);background:var(--blue-wash)}
+  @media(max-width:720px){.wh>div:first-child{border-right:0;border-bottom:1px solid var(--line)}}
+  .wh h4{margin:0 0 .6em;font-size:.74rem;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .wh ul{margin:0;padding-left:1.1em} .wh li{margin:.3em 0;font-size:.9rem}
+
+  /* ── status ── */
+  .status{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:720px){.status{grid-template-columns:1fr}}
+  .status ul{list-style:none;margin:0;padding:0}
+  .status li{display:flex;gap:.6em;padding:.4em 0;font-size:.92rem;border-bottom:1px solid var(--line)}
+  .status li:last-child{border-bottom:0}
+  .mark{flex:0 0 auto;font-family:var(--mono);font-weight:700}
+  .done .mark{color:var(--c-partition)} .todo .mark{color:var(--c-electrical)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:20px 22px}
+  .panel h3{margin-top:0}
+
+  .foot{padding:34px 0 60px;color:var(--faint);font-size:.82rem;font-family:var(--mono);letter-spacing:.03em}
+  .lead-note{border-left:3px solid var(--blue);background:var(--blue-wash);padding:12px 16px;
+    border-radius:0 6px 6px 0;font-size:.92rem;color:#2a3340;margin:0 0 1em}
+</style>
+
+<div class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow">Configuration Architecture · Design Report</p>
+    <h1>One form, one JSON, five drawings.</h1>
+    <p class="lede">How a stack of hardcoded, brand-specific CAD scripts became a single
+      configuration-driven engine — where a customer fills one form and the system draws flooring,
+      speaker, sprinkler, partition and electrical layouts from the same shared description of their store.</p>
+    <div class="tagrow">
+      <span class="tag">Schema v3.1</span>
+      <span class="tag">DXF · ezdxf · shapely</span>
+      <span class="tag">5 dockets</span>
+      <span class="tag">Shared zones · $ref</span>
+    </div>
+  </div>
+</div>
+
+<div class="doc">
+
+  <section>
+    <p class="eyebrow">01 — The problem</p>
+    <h2>Every brand had its own script. None of them generalised.</h2>
+    <p>Each layout type started life as a standalone Python script written for one client, with
+      layer names, block names, labels, sizes and placement rules <em>baked into the code</em> — the
+      electrical generator alone carried roughly forty hardcoded constants and a dozen block-name lists.
+      Onboarding a new store meant editing source.</p>
+    <p>The goal of this work is to <strong>decouple the data from the logic</strong>: the customer
+      describes their drawing once, in plain layer and block names, through a form. That produces a
+      single JSON config. The engines keep the clever geometry but read every name, label and zone
+      from the config instead of from constants.</p>
+    <p class="lead-note">Design rule throughout: the <strong>config says <em>what</em></strong>
+      (which layers, which zones, which labels) — the <strong>engine owns <em>how</em></strong>
+      (the placement maths). Anything a customer can't reasonably know stays in the engine as a default.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">02 — System architecture</p>
+    <h2>Form → config → pipeline → drawings</h2>
+    <p>The live app (<code>app.py</code> serving <code>flooring_app.html</code>) is the front door.
+      A customer uploads a DXF; the app reads its layers, blocks and text labels and offers them back
+      as autocomplete. The form assembles one JSON config, which the pipeline turns into geometry and
+      hands to each enabled docket engine.</p>
+    <div class="flow-wrap">
+      <div class="flow">
+        <div class="stage">
+          <div class="n">STEP 1–9</div><b>Customer form</b>
+          <span>Upload DXF · pick store outline, zones, and per-docket inputs. Live JSON preview.</span>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage">
+          <div class="n">SCHEMA 3.1</div><b>config.json</b>
+          <span>Shared <code>zones</code> catalog + one block per docket, linked by <code>$ref</code>.</span>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage">
+          <div class="n">GLUE</div><b>Pipeline</b>
+          <span>Resolve <code>$ref</code> → extract each zone to a polygon from the DXF → dispatch.</span>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage">
+          <div class="n">ENGINES</div><b>DXF layouts</b>
+          <span>Each docket draws its markers / tiles / points and writes the output DXF.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">03 — The core idea</p>
+    <h2>Zones are defined once and referenced everywhere</h2>
+    <p>A retail floor (FOH), a toilet, a pickup table, a clinic — these regions are needed by more than
+      one docket. Re-listing them per docket would bloat the config and let copies drift. Instead every
+      region lives once in a shared <code>zones</code> catalog, and each docket points at it with a
+      JSON reference: <code>{"$ref":"#/zones/&lt;name&gt;"}</code>. Sibling keys alongside a
+      <code>$ref</code> override it.</p>
+    <div class="splitcols">
+      <div>
+        <h3>Defined once</h3>
+<pre><span class="k">"zones"</span>: {
+  <span class="k">"Toilet"</span>:     { <span class="k">"identifier"</span>:<span class="s">"balloon"</span>,  <span class="k">"keyword"</span>:<span class="s">"TOILET"</span> },
+  <span class="k">"FOH"</span>:        { <span class="k">"identifier"</span>:<span class="s">"polyline"</span>, <span class="k">"layer"</span>:<span class="s">"FOH_ZONE_OUTLINE"</span> },
+  <span class="k">"PickupTable"</span>: { <span class="k">"identifier"</span>:<span class="s">"balloon"</span>,  <span class="k">"keyword"</span>:<span class="s">"PICKUP"</span> },
+  <span class="k">"Storage"</span>:    { <span class="k">"identifier"</span>:<span class="s">"polyline"</span>, <span class="k">"layer"</span>:<span class="s">"STORAGE_AREA_OUTLINE"</span> }
+}</pre>
+      </div>
+      <div>
+        <h3>Referenced from any docket</h3>
+<pre><span class="c">// flooring</span>
+{ <span class="k">"zone"</span>: {<span class="ref">"$ref":"#/zones/Toilet"</span>}, <span class="k">"flooring_type"</span>:<span class="s">"NoFloor"</span> }
+
+<span class="c">// speaker</span>
+{ <span class="k">"target"</span>: {<span class="ref">"$ref":"#/zones/PickupTable"</span>}, <span class="k">"position"</span>:<span class="s">"center"</span> }
+
+<span class="c">// electrical</span>
+{ <span class="k">"reference_zone"</span>: {<span class="ref">"$ref":"#/zones/FOH"</span>} }</pre>
+      </div>
+    </div>
+    <p>A zone knows <em>how it is found</em> in the DXF — a closed <code>polyline</code> on a layer,
+      a named <code>block</code>, or a <code>balloon</code> (a text keyword inflated to the surrounding
+      walls). That single definition is enough for the pipeline to extract a real polygon, whichever
+      docket asked for it.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">04 — The dockets</p>
+    <h2>Five layouts, one config spine</h2>
+    <p>Each docket is an optional block in the config and a collapsible step in the form. Flooring is
+      the spine; the other four are toggled on as needed. All of them draw on the same store outline
+      and the same shared zones.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Docket</th><th>Form step</th><th>Produces</th><th>Key inputs</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td><span class="dot" style="background:var(--c-floor)"></span>Flooring</td><td class="num">3–5</td><td>Tiled floor + BOQ quantities</td><td>store outline, zones → tile / hatch / skip types</td></tr>
+          <tr><td class="num">2</td><td><span class="dot" style="background:var(--c-speaker)"></span>Speaker</td><td class="num">6</td><td>Speaker + amplifier-box placement</td><td>coverage radius, placements (corners / centre / auto), boxes</td></tr>
+          <tr><td class="num">3</td><td><span class="dot" style="background:var(--c-sprinkler)"></span>Sprinkler</td><td class="num">7</td><td>100%-coverage head grid</td><td>coverage radius, max spacing, exclude zones</td></tr>
+          <tr><td class="num">4</td><td><span class="dot" style="background:var(--c-partition)"></span>Partition</td><td class="num">8</td><td>Clean civil marking plan</td><td>keep-layers, zone styling, area labels</td></tr>
+          <tr><td class="num">5</td><td><span class="dot" style="background:var(--c-electrical)"></span>Electrical</td><td class="num">9</td><td>WP / CP / FP / CDP points</td><td>reference zone, columns + glass layers, point groups</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="docket">
+      <div class="docket-head"><span class="chip" style="background:var(--c-floor)">Flooring</span><h3>Tile &amp; hatch the floor</h3></div>
+      <p class="role">Zones are assigned a <em>flooring type</em> (a tile size + rotation, a hatch pattern, or skip).
+        With no assignments the whole store is floored with the default type.</p>
+<pre><span class="k">"flooring"</span>: {
+  <span class="k">"store_outline"</span>: { <span class="k">"layers"</span>: [<span class="s">"PLANO-CARPET"</span>] },
+  <span class="k">"zones"</span>: [ { <span class="k">"zone"</span>: {<span class="ref">"$ref":"#/zones/Toilet"</span>}, <span class="k">"flooring_type"</span>:<span class="s">"NoFloor"</span> } ],
+  <span class="k">"wall_frame"</span>: { <span class="k">"mirror_layers"</span>: [<span class="s">"A-WALL"</span>, <span class="s">"LK-PARTITION"</span>] }
+}</pre>
+    </div>
+
+    <div class="docket">
+      <div class="docket-head"><span class="chip" style="background:var(--c-speaker)">Speaker</span><h3>Place speakers by coverage</h3></div>
+      <p class="role">Each speaker covers a circle (its coverage radius — the "balloon"). Placements pick a
+        target (a zone or the whole store) and a position; a blank count auto-fits by coverage. Amplifier
+        boxes are a separate fixture at a zone such as the pickup table.</p>
+<pre><span class="k">"speaker"</span>: {
+  <span class="k">"model"</span>: { <span class="k">"coverage_radius_mm"</span>:4000, <span class="k">"box_width_mm"</span>:400, <span class="k">"box_height_mm"</span>:200 },
+  <span class="k">"placements"</span>: [ { <span class="k">"target"</span>: {<span class="ref">"$ref":"#/zones/FOH"</span>}, <span class="k">"position"</span>:<span class="s">"corners"</span>, <span class="k">"count"</span>:null } ],
+  <span class="k">"boxes"</span>:      [ { <span class="k">"target"</span>: {<span class="ref">"$ref":"#/zones/PickupTable"</span>}, <span class="k">"position"</span>:<span class="s">"center"</span> } ]
+}</pre>
+    </div>
+
+    <div class="docket">
+      <div class="docket-head"><span class="chip" style="background:var(--c-sprinkler)">Sprinkler</span><h3>Full-coverage head grid</h3></div>
+      <p class="role">Fills the store (minus excluded zones) so every point lies within a head's radius.
+        Spacing is <code>min(radius·√2, max_spacing)</code>; the head count is computed, never entered.</p>
+<pre><span class="k">"sprinkler"</span>: {
+  <span class="k">"model"</span>: { <span class="k">"coverage_radius_mm"</span>:2300, <span class="k">"max_spacing_mm"</span>:3700, <span class="k">"pattern"</span>:<span class="s">"square"</span> },
+  <span class="k">"target"</span>: <span class="s">"store"</span>,
+  <span class="k">"exclude"</span>: [ {<span class="ref">"$ref":"#/zones/Toilet"</span>} ]
+}</pre>
+    </div>
+
+    <div class="docket">
+      <div class="docket-head"><span class="chip" style="background:var(--c-partition)">Partition</span><h3>Clean civil marking plan</h3></div>
+      <p class="role">Purges everything not on the keep-layers (a block survives only if it contains a
+        structural layer), restyles zone outlines by colour + lineweight, and optionally labels each
+        zone's area. Styling targets a shared zone — the zone already carries its layer and polygon.</p>
+<pre><span class="k">"partition"</span>: {
+  <span class="k">"keep"</span>: { <span class="k">"boundary"</span>:[…], <span class="k">"structural"</span>:[<span class="s">"A-WALL"</span>], <span class="k">"partitions"</span>:[…], <span class="k">"text"</span>:[…] },
+  <span class="k">"style"</span>: [ { <span class="k">"zone"</span>: {<span class="ref">"$ref":"#/zones/Storage"</span>}, <span class="k">"color_aci"</span>:1, <span class="k">"lineweight"</span>:50, <span class="k">"label_area"</span>:true } ],
+  <span class="k">"label_layer"</span>: <span class="s">"SYSTEM_LABELS"</span>
+}</pre>
+    </div>
+
+    <div class="docket">
+      <div class="docket-head"><span class="chip" style="background:var(--c-electrical)">Electrical</span><h3>Power &amp; data points</h3></div>
+      <p class="role">The richest docket. Each <em>point group</em> matches fixtures by layer / block name,
+        chooses where the point goes (<code>place</code> selects the engine algorithm), and carries the
+        spec label + note. The reference zone sets the outward leader direction; columns and glass layers
+        feed ceiling-point placement.</p>
+<pre><span class="k">"electrical"</span>: {
+  <span class="k">"reference_zone"</span>: {<span class="ref">"$ref":"#/zones/FOH"</span>},
+  <span class="k">"columns_layer"</span>: <span class="s">"column"</span>,
+  <span class="k">"glass_layers"</span>: [<span class="s">"Glass-FrontGlazing"</span>, <span class="s">"A-GLAZING"</span>],
+  <span class="k">"groups"</span>: [
+    { <span class="k">"match"</span>:[<span class="s">"JJ_FIXTURE_"</span>,<span class="s">"MIRROR_"</span>], <span class="k">"place"</span>:<span class="s">"wall"</span>,    <span class="k">"label"</span>:<span class="s">"WP1"</span>, <span class="k">"note"</span>:<span class="s">"6A RAW POINT @2250MM"</span> },
+    { <span class="k">"match"</span>:[<span class="s">"SCREEN_55"</span>],            <span class="k">"place"</span>:<span class="s">"ceiling"</span>, <span class="k">"label"</span>:<span class="s">"CP4"</span>, <span class="k">"note"</span>:<span class="s">"6/16A + CAT6"</span> },
+    { <span class="k">"match"</span>:[<span class="s">"QMS_DESK"</span>,<span class="s">"BILLING_COUNTER"</span>], <span class="k">"place"</span>:<span class="s">"floor"</span>, <span class="k">"label"</span>:<span class="s">"FP2"</span>, <span class="k">"note"</span>:<span class="s">"6/16A RAW IN FLOOR"</span> },
+    { <span class="k">"match"</span>:[<span class="s">"PICKUP_TABLE"</span>],         <span class="k">"place"</span>:<span class="s">"data"</span>,    <span class="k">"label"</span>:<span class="s">"CT1"</span>, <span class="k">"note"</span>:<span class="s">"3-CONDUIT FLOOR BOX"</span> }
+  ]
+}</pre>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">05 — Generalisation in practice</p>
+    <h2>What the config carries vs. what the engine keeps</h2>
+    <p>The electrical reference script is the clearest case. Reading it line by line, every input fell
+      into one of two buckets — the customer's facts, which became config, and the drawing intelligence,
+      which stayed in code.</p>
+    <div class="wh">
+      <div>
+        <h4>Config decides — what</h4>
+        <ul>
+          <li>Which layers are zones, columns, glass, boundary</li>
+          <li>Which block / layer names are which fixtures</li>
+          <li>The point category &amp; placement intent (<code>place</code>)</li>
+          <li>Every visible label and spec note</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Engine decides — how</h4>
+        <ul>
+          <li>Snap-to-wall, project-to-room-wall, façade clustering</li>
+          <li>The AR fixture split by distance to the FOH boundary</li>
+          <li>Switchboard walk that avoids curtains; column avoidance</li>
+          <li>Symbol sizes, leader geometry, dimensioning, colours (defaults)</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:1.2em">This split is also why the electrical form landed on
+      <strong>point groups</strong> rather than four bare lists: the category isn't just a name bucket,
+      it selects a placement algorithm. Four fields per group — <code>match</code>, <code>place</code>,
+      <code>label</code>, <code>note</code> — is the minimum that still draws a real, annotated electrical
+      plan instead of unlabeled dots.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">06 — The form</p>
+    <h2>A builder that writes the JSON for you</h2>
+    <p>The form is a nine-step builder with a live JSON preview. Uploading a DXF populates autocomplete
+      for every layer, block and text label, so customers pick from what's actually in their drawing
+      rather than typing blind. Shared zones are defined once in Step 3 and appear in every docket's
+      dropdowns thereafter — the same dedup as the JSON, enforced in the UI.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Steps</th><th>Section</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1–2</td><td>Upload &amp; store outline</td><td>The DXF and its boundary — the one required input</td></tr>
+          <tr><td class="num">3</td><td>Zones (shared)</td><td>Define each region once; reused by every docket below</td></tr>
+          <tr><td class="num">4–5</td><td>Flooring types &amp; assignment</td><td>Define finishes, assign them to zones</td></tr>
+          <tr><td class="num">6–9</td><td>Speaker · Sprinkler · Partition · Electrical</td><td>Optional dockets, each a toggle</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">07 — Status</p>
+    <h2>Where it stands</h2>
+    <div class="status">
+      <div class="panel done">
+        <h3>Done</h3>
+        <ul>
+          <li class="done"><span class="mark">✓</span><span>Schema 3.1 with shared <code>zones</code> + <code>$ref</code> dedup</span></li>
+          <li class="done"><span class="mark">✓</span><span>All five docket blocks designed &amp; validated</span></li>
+          <li class="done"><span class="mark">✓</span><span>Nine-step form builder with live JSON preview</span></li>
+          <li class="done"><span class="mark">✓</span><span>DXF-driven autocomplete for layers / blocks / labels</span></li>
+          <li class="done"><span class="mark">✓</span><span>Reference sample config (<code>layout_config_sample.json</code>)</span></li>
+        </ul>
+      </div>
+      <div class="panel todo">
+        <h3>Next — pipeline wiring</h3>
+        <ul>
+          <li class="todo"><span class="mark">→</span><span><code>$ref</code> resolver (expand refs, merge siblings)</span></li>
+          <li class="todo"><span class="mark">→</span><span>Zone → polygon extraction dispatch (polyline / block / balloon)</span></li>
+          <li class="todo"><span class="mark">→</span><span>Per-docket draw engines reading config, not constants</span></li>
+          <li class="todo"><span class="mark">→</span><span>Output assembly: merged vs. per-docket DXF</span></li>
+          <li class="todo"><span class="mark">→</span><span>Shared annotation scale / symbol defaults</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">DXF Layout Engine · configuration architecture · schema v3.1 · flooring · speaker · sprinkler · partition · electrical</div>
+</div>

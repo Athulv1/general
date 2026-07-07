@@ -1,0 +1,19 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Runtime job + output artifacts (per-run, large, may contain client DXFs)
+jobs/
+output/
+_layers_*.dxf
+
+# Serialized run context (regenerated each run)
+*.ctx
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

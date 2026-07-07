@@ -1,0 +1,52 @@
+{
+  "schema_version": "2.0",
+  "units": "mm",
+
+  "io": {
+    "input_dxf": "TEST_CUSTOM_LAYERS.dxf",
+    "output_dxf": "",
+    "ctx_file": "test_context.ctx"
+  },
+
+  "params": {
+    "tile_size_mm": 600,
+    "tile_rotation_deg": 45,
+    "wastage_pct": 10,
+    "min_door_width_mm": 600
+  },
+
+  "flooring": {
+    "docket": "flooring",
+
+    "store_outline": {
+      "dxf_types": ["LWPOLYLINE", "POLYLINE"],
+      "layers": ["SHOP_BOUNDARY"],
+      "layer_pattern": null,
+      "role": "site_boundary",
+      "required": true
+    },
+
+    "wall_frame": {
+      "mirror_layers": ["BUILDING_WALL"],
+      "hatch_layers": []
+    },
+
+    "zone_outlines": [
+      {
+        "id": "WET",
+        "dxf_types": ["LWPOLYLINE", "POLYLINE"],
+        "layers": ["WET_AREA"],
+        "layer_pattern": null,
+        "role": "exclude_region",
+        "action": "skip",
+        "start_point": {
+          "dxf_types": ["INSERT", "POINT"],
+          "layers": ["TILE_ORIGIN_PT"],
+          "layer_pattern": null,
+          "scope": "global",
+          "required": false
+        }
+      }
+    ]
+  }
+}

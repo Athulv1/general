@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flooring + Speaker Layout Generator — Zones</title>
+<style>
+  :root{--bg:#0f1117;--panel:#171a23;--panel2:#1e222e;--line:#2a2f3d;--text:#e6e8ee;
+    --muted:#9aa3b2;--accent:#4f8cff;--accent2:#2bd4a4;--danger:#ff5d6c;--chip:#262b38;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  .wrap{display:grid;grid-template-columns:1fr 470px;min-height:100vh}
+  @media(max-width:1050px){.wrap{grid-template-columns:1fr}}
+  .form{padding:26px 30px;overflow-y:auto}
+  .side{background:var(--panel);border-left:1px solid var(--line);padding:22px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+  .card .desc{color:var(--muted);font-size:12px;margin:0 0 14px}
+  .req{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 7px;border-radius:20px}
+  .opt{font-size:10px;font-weight:700;background:var(--chip);color:var(--muted);padding:2px 7px;border-radius:20px}
+  label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;outline:none}
+  input:focus,select:focus{border-color:var(--accent)}
+  .rowbox{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:10px}
+  .flex{display:flex;gap:10px}.flex>div{flex:1}
+  .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .head b{font-size:13px}
+  .rm{background:transparent;border:1px solid var(--line);color:var(--danger);border-radius:7px;padding:4px 9px;font-size:12px;cursor:pointer}
+  .add{background:transparent;border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:9px;width:100%;font-size:13px;font-weight:600;cursor:pointer}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn.alt{background:var(--chip);color:var(--text);border:1px solid var(--line)}
+  .btn.gen{background:var(--accent2);color:#06231b;font-size:15px;padding:13px;width:100%;font-weight:700}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted);cursor:pointer}
+  .drop:hover,.drop.drag{border-color:var(--accent);color:var(--text);background:var(--panel2)}
+  .filebadge{display:none;margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+  .ok{color:var(--accent2)}.bad{color:var(--danger)}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:11px;line-height:1.5;overflow:auto;white-space:pre-wrap;color:#cdd6e4;max-height:300px}
+  .side h2{font-size:12px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .hint{color:var(--muted);font-size:11px;margin-top:6px}
+  .step{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.08em;margin-bottom:6px}
+  .result{margin-top:14px;display:none}.result.show{display:block}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #06231b;border-top-color:transparent;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .gap{height:10px}
+  .switch{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+  .switch input{width:auto}
+  .tags{position:relative;display:flex;flex-wrap:wrap;gap:6px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;padding:6px 8px;cursor:text}
+  .tag-menu{position:fixed;z-index:1000;background:var(--panel2);border:1px solid var(--accent);
+    border-radius:8px;max-height:230px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+  .tag-opt{padding:7px 11px;font-size:13px;cursor:pointer;color:var(--text);white-space:nowrap}
+  .tag-opt:hover{background:var(--chip)}
+  .aci-swatch{width:100%;height:36px;border:1px solid var(--line);border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;
+    text-shadow:0 0 3px rgba(0,0,0,.6);color:#fff}
+  .aci-menu{position:fixed;z-index:1000;background:var(--panel2);border:1px solid var(--accent);border-radius:8px;
+    padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.45);display:grid;grid-template-columns:repeat(5,26px);gap:6px}
+  .aci-cell{width:26px;height:22px;border-radius:5px;border:1px solid rgba(255,255,255,.2);cursor:pointer}
+  .aci-cell:hover{outline:2px solid var(--accent);outline-offset:1px}
+  .tags:focus-within{border-color:var(--accent)}
+  .tags .tag-in{border:none;background:transparent;flex:1;min-width:130px;padding:3px 4px;color:var(--text);font-size:13px;outline:none}
+  .tag-chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid var(--line);
+    border-radius:6px;padding:2px 4px 2px 8px;font-size:12px}
+  .tag-chip button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="form">
+    <h1>Flooring + Speaker Layout Generator</h1>
+    <p class="sub">Upload a DXF, define zones once, then assign flooring and speakers to them.</p>
+
+    <!-- STEP 1 -->
+    <div class="card">
+      <div class="step">STEP 1</div>
+      <h2>Upload your DXF</h2>
+      <p class="desc">We read its layers, blocks and text labels so you can pick them below.</p>
+      <div class="drop" id="drop" onclick="document.getElementById('dxf').click()">⬆ <b>Click</b> or drag a .dxf here</div>
+      <input type="file" id="dxf" accept=".dxf" style="display:none" onchange="onFile(this.files[0])">
+      <div class="filebadge" id="filebadge"></div>
+    </div>
+
+    <!-- STEP 2: store outline -->
+    <div class="card">
+      <div class="step">STEP 2</div>
+      <h2>Store outline <span class="req">REQUIRED</span></h2>
+      <p class="desc">Layer holding one closed shape around the whole floor.</p>
+      <input type="text" id="storeLayer" data-combo="dl-closed" placeholder="e.g. PLANO-CARPET" oninput="render()">
+    </div>
+
+    <!-- STEP 3: zones (shared catalog) -->
+    <div class="card">
+      <div class="step">STEP 3</div>
+      <h2>Zones <span class="opt">SHARED</span></h2>
+      <p class="desc">Define every region <b>once</b> here — a closed polyline, a block, or a room found by its <b>text label</b> (balloon). Flooring and Speakers below both reference these by name (no duplication).</p>
+      <div id="zones"></div>
+      <button class="add" onclick="addZone()">+ Add zone</button>
+    </div>
+
+    <!-- STEP 4: flooring types -->
+    <div class="card">
+      <div class="step">STEP 4</div>
+      <h2>Flooring types</h2>
+      <p class="desc">Define each finish once: a <b>tile</b> (length×width×rotation) or a <b>hatch</b> pattern. Assign them to zones below.</p>
+      <div id="ftypes"></div>
+      <button class="add" onclick="addFType()">+ Add flooring type</button>
+    </div>
+
+    <!-- STEP 5: flooring assignments -->
+    <div class="card">
+      <div class="step">STEP 5</div>
+      <h2>Flooring per zone</h2>
+      <p class="desc">Give a zone a flooring type. Leave this empty to floor the whole store with the default type below.</p>
+      <div id="fassign"></div>
+      <button class="add" onclick="addFAssign()">+ Assign flooring to a zone</button>
+      <div class="gap"></div>
+      <label>Default flooring type (used when there are no zone assignments)</label>
+      <select id="defaultType" onchange="render()"></select>
+    </div>
+
+    <!-- STEP 6: speaker layout -->
+    <div class="card">
+      <div class="step">STEP 6</div>
+      <h2>Speaker layout <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Place speakers in a zone, a named room, the front-of-house, or across the whole store. Each speaker covers a circle (its <b>coverage radius</b>) — leave a count blank to auto-fit speakers to the area.</p>
+      <div class="switch"><input type="checkbox" id="spEnabled" onchange="render()"><label style="margin:0">Add a speaker layout to the output</label></div>
+      <div id="speakerBody" style="display:none">
+        <div class="gap"></div>
+        <div class="flex">
+          <div><label>Speaker size (mm)</label><input id="sp-size" type="number" min="1" value="300" oninput="render()"></div>
+          <div><label>Coverage radius (mm)</label><input id="sp-cov" type="number" min="1" value="4000" oninput="render()"></div>
+        </div>
+        <div class="hint">Coverage radius = how far one speaker reaches (the "balloon").</div>
+
+        <div class="gap"></div>
+        <label>How to place speakers</label>
+        <select id="sp-mode" onchange="render()">
+          <option value="placement">Manual — pick positions per zone</option>
+          <option value="coverage">Auto by coverage — fill an area</option>
+        </select>
+
+        <!-- Auto-by-coverage mode -->
+        <div id="sp-coverage-box" style="display:none">
+          <div class="gap"></div>
+          <div class="flex">
+            <div style="flex:2"><label>Area to cover — pick one or more zones (blank = whole store)</label><div class="tags sp-cov-zones" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a zone…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div></div>
+            <div><label>Grid pattern</label><select id="sp-cov-pattern" onchange="render()">
+              <option value="square">square grid</option>
+              <option value="staggered">staggered (triangular)</option>
+            </select></div>
+          </div>
+          <div class="hint">Speakers are auto-placed on a grid so every point is within the coverage radius. Count is computed automatically.</div>
+        </div>
+
+        <!-- Manual placement mode -->
+        <div id="sp-placement-box">
+          <div class="gap"></div>
+          <div class="flex">
+            <div><label>Speaker box width (mm)</label><input id="sb-w" type="number" min="1" value="400" oninput="render()"></div>
+            <div><label>Speaker box height (mm)</label><input id="sb-h" type="number" min="1" value="200" oninput="render()"></div>
+          </div>
+          <div class="hint">Box dims are for the amplifier box placed below.</div>
+
+          <div class="gap"></div>
+          <label>Speakers — where the speakers themselves go</label>
+          <div id="splace"></div>
+          <button class="add" onclick="addSPlace()">+ Add speaker placement</button>
+
+          <div class="gap"></div>
+          <label>Speaker boxes — the amplifier box at a zone (e.g. pickup table)</label>
+          <div id="sboxes"></div>
+          <button class="add" onclick="addSBox()">+ Add speaker box</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 7: sprinkler layout -->
+    <div class="card">
+      <div class="step">STEP 7</div>
+      <h2>Sprinkler layout <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Fills the store with sprinkler heads on a grid so every point is within a head's <b>coverage radius</b> — 100% coverage, no gaps. Count is computed automatically.</p>
+      <div class="switch"><input type="checkbox" id="skEnabled" onchange="render()"><label style="margin:0">Add a sprinkler layout to the output</label></div>
+      <div id="sprinklerBody" style="display:none">
+        <div class="gap"></div>
+        <div class="flex">
+          <div><label>Coverage radius (mm)</label><input id="sk-rad" type="number" min="1" value="2300" oninput="render()"></div>
+          <div><label>Max spacing (mm)</label><input id="sk-space" type="number" min="1" value="3700" oninput="render()"></div>
+          <div><label>Grid pattern</label><select id="sk-pattern" onchange="render()">
+            <option value="square">square grid</option>
+            <option value="staggered">staggered (triangular)</option>
+          </select></div>
+        </div>
+        <div class="hint">Coverage radius = the circle each head protects. For 100% cover the grid spacing is min(radius×√2, max&nbsp;spacing). Max spacing caps center-to-center distance (fire code).</div>
+        <div class="gap"></div>
+        <div class="switch"><input type="checkbox" id="sk-minroom" checked onchange="render()"><label style="margin:0">Put at least one sprinkler in every closed room (even if the grid already covers it)</label></div>
+        <div id="sk-rooms-box">
+          <div class="gap"></div>
+          <label>Rooms that must each get a sprinkler — pick zones (blank = every closed room, found automatically)</label>
+          <div class="tags sk-rooms" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a room / zone…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 8: partition / civil marking plan -->
+    <div class="card">
+      <div class="step">STEP 8</div>
+      <h2>Partition / marking plan <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Produces a clean marking plan: keeps only the layers you list and <b>removes everything else</b>, <b>colours your zone outlines</b>, and can <b>label each zone's area</b>. The store outline is always kept.</p>
+      <div class="switch"><input type="checkbox" id="ptEnabled" onchange="render()"><label style="margin:0">Add a partition / marking plan to the output</label></div>
+      <div id="partitionBody" style="display:none">
+        <div class="gap"></div>
+        <p class="desc" style="margin:0 0 8px">Layers to keep — everything else is removed. A furniture/fixture block is kept only if it sits on a <b>Walls &amp; structure</b> layer.</p>
+        <div class="flex">
+          <div>
+            <label>Outer boundary — store edge, lease line</label>
+            <div id="pk-boundary"></div>
+            <button class="add" onclick="addPLayer('boundary')">+ add layer</button>
+          </div>
+          <div>
+            <label>Walls &amp; structure — walls, columns, beams</label>
+            <div id="pk-structural"></div>
+            <button class="add" onclick="addPLayer('structural')">+ add layer</button>
+          </div>
+        </div>
+        <div class="gap"></div>
+        <div class="flex">
+          <div>
+            <label>Internal dividers — partitions, glass, curtains, shutters</label>
+            <div id="pk-partitions"></div>
+            <button class="add" onclick="addPLayer('partitions')">+ add layer</button>
+          </div>
+          <div>
+            <label>Room labels &amp; notes — text layers</label>
+            <div id="pk-text"></div>
+            <button class="add" onclick="addPLayer('text')">+ add layer</button>
+          </div>
+        </div>
+
+        <div class="gap"></div>
+        <label>Zone styling — outline colour &amp; line thickness per zone, optional area label</label>
+        <div id="pstyle"></div>
+        <button class="add" onclick="addPStyle()">+ Style a zone</button>
+
+        <div class="gap"></div>
+        <label>Layer for area labels (where the m² text is written)</label>
+        <input type="text" id="pt-labellayer" value="SYSTEM_LABELS" oninput="render()">
+      </div>
+    </div>
+
+    <!-- STEP 9: electrical layout -->
+    <div class="card">
+      <div class="step">STEP 9</div>
+      <h2>Electrical layout <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Places electrical points — Wall (WP), Ceiling (CP), Floor (FP) and Data (CDP) — by matching <b>fixture groups</b> (block / layer name patterns) and rendering them relative to the zones below. The store outline is the boundary.</p>
+      <div class="switch"><input type="checkbox" id="elEnabled" onchange="render()"><label style="margin:0">Add an electrical layout to the output</label></div>
+      <div id="electricalBody" style="display:none">
+        <div class="gap"></div>
+        <p class="desc" style="margin:0 0 8px"><b>Point groups</b> — match fixtures by layer / block name, choose where the point goes, and give its label + spec note.</p>
+        <div id="elgroups"></div>
+        <button class="add" onclick="addELGroup()">+ Add point group</button>
+      </div>
+    </div>
+
+    <!-- STEP 10: finishes & BOQ -->
+    <div class="card">
+      <div class="step">STEP 10</div>
+      <h2>Finishes &amp; BOQ <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Marks wall finishes on the plan — paint, tile, mirror, fluting, laminate, ACP — and totals each one's area for the BOQ. Area = wall length × the height you give.</p>
+      <div class="switch"><input type="checkbox" id="fnEnabled" onchange="render()"><label style="margin:0">Add finishes &amp; a BOQ to the output</label></div>
+      <div id="finishesBody" style="display:none">
+        <div class="gap"></div>
+        <p class="desc" style="margin:0 0 8px"><b>Finishes</b> — name the material, where it goes (zone names from Step 3, or layer / block names), and its height up the wall.</p>
+        <div id="finlist"></div>
+        <button class="add" onclick="addFinish()">+ Add finish</button>
+      </div>
+    </div>
+
+    <!-- STEP 11: skirting -->
+    <div class="card">
+      <div class="step">STEP 11</div>
+      <h2>Skirting layout <span class="opt">OPTIONAL</span></h2>
+      <p class="desc">Runs the skirting — the short strip where the floor meets the wall — around the rooms you choose. Measured in running metres; follows real walls (uses your Walls layers) and skips door openings.</p>
+      <div class="switch"><input type="checkbox" id="skrEnabled" onchange="render()"><label style="margin:0">Add a skirting layout to the output</label></div>
+      <div id="skirtingBody" style="display:none">
+        <div class="gap"></div>
+        <div class="flex">
+          <div style="flex:2"><label>Rooms / zones to skirt — pick zones</label><div class="tags skr-zones" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a zone…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div></div>
+          <div><label>Skirting height (mm)</label><input type="number" id="skr-height" min="0" value="100" oninput="render()"></div>
+        </div>
+        <div class="gap"></div>
+        <label>Exclude — rooms / areas that get no skirting (pick zones, or block / layer names)</label>
+        <div class="tags skr-exclude" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-applies" placeholder="type or pick a zone / block / layer…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
+        <div class="hint">Skirting normally follows the tiled / floored rooms. Leave the top field empty to skip skirting entirely.</div>
+      </div>
+    </div>
+
+    <!-- Walls -->
+    <div class="card">
+      <h2>Walls</h2>
+      <p class="desc">The output is clean — walls + flooring + speakers only (furniture, fixtures and dimensions are not copied). List the structural layers to copy into the output as the wall frame: walls, partitions, columns, beams, glazing.</p>
+      <div id="keeps"></div>
+      <button class="add" onclick="addKeep()">+ Add wall layer</button>
+    </div>
+  </div>
+
+  <!-- SIDE -->
+  <div class="side">
+    <div class="step">GENERATE</div>
+    <button class="btn gen" id="genBtn" onclick="generate()" disabled>Generate Layout</button>
+    <div class="hint" id="genHint">Upload a DXF and set the store outline first.</div>
+    <div class="result" id="result">
+      <div id="resultMsg" style="margin:14px 0 10px;font-weight:600"></div>
+      <div id="dlLinks" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <pre id="log" style="margin-top:12px"></pre>
+    </div>
+    <h2 style="margin-top:22px">Config (JSON)</h2>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn alt" onclick="copyJson()">⧉ Copy</button>
+      <button class="btn alt" onclick="downloadCfg()">⬇ Save</button>
+    </div>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<datalist id="dl-closed"></datalist>
+<datalist id="dl-all"></datalist>
+<datalist id="dl-points"></datalist>
+<datalist id="dl-blocks"></datalist>
+<datalist id="dl-texts"></datalist>
+<datalist id="dl-match"></datalist>
+<datalist id="dl-applies"></datalist>
+
+<script>
+let dxfFile=null, PATTERNS=["SOLID"], roomLayerMap={}, LAYERS=[], BLOCKS=[];
+
+// ── boot ──
+fetch("/patterns").then(r=>r.json()).then(j=>{PATTERNS=j.patterns||PATTERNS;
+  document.querySelectorAll(".f-pattern").forEach(s=>fillPatternSelect(s,s.value));});
+
+// ── upload ──
+const drop=document.getElementById("drop");
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag")}));
+drop.addEventListener("drop",e=>{if(e.dataTransfer.files[0])onFile(e.dataTransfer.files[0]);});
+async function onFile(file){
+  if(!file)return; dxfFile=file;
+  const b=document.getElementById("filebadge"); b.style.display="block";
+  b.innerHTML=`<span class="spin" style="border-color:var(--accent);border-top-color:transparent"></span> Reading <b>${file.name}</b>…`;
+  const fd=new FormData(); fd.append("dxf",file);
+  try{
+    const j=await (await fetch("/layers",{method:"POST",body:fd})).json();
+    if(j.error)throw new Error(j.error);
+    fill("dl-all",j.all);fill("dl-closed",j.closed);fill("dl-points",j.points);fill("dl-blocks",j.blocks);
+    LAYERS=j.all||[]; BLOCKS=j.blocks||[]; rebuildCombos();
+    roomLayerMap={}; (j.texts||[]).forEach(x=>roomLayerMap[x.label]=x.layer);
+    fillRaw("dl-texts",(j.texts||[]).map(x=>x.label));
+    b.innerHTML=`<span class="ok">✓</span> <b>${file.name}</b> — ${j.all.length} layers, ${(j.blocks||[]).length} blocks, ${(j.texts||[]).length} labels.`;
+  }catch(e){b.innerHTML=`<span class="bad">✕ ${e.message}</span>`;}
+  render();
+}
+function fill(id,a){document.getElementById(id).innerHTML=(a||[]).map(n=>`<option value="${esc(n)}">`).join("");}
+function fillRaw(id,a){fill(id,a);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+// ── ACI colour palette (swatch shows the colour; the DXF stores the ACI index) ──
+const ACI_PALETTE=[
+  {a:1,h:'#FF0000'},{a:2,h:'#FFFF00'},{a:3,h:'#00FF00'},{a:4,h:'#00FFFF'},{a:5,h:'#0000FF'},
+  {a:6,h:'#FF00FF'},{a:7,h:'#FFFFFF'},{a:8,h:'#414141'},{a:9,h:'#808080'},{a:30,h:'#FF7F00'},
+  {a:40,h:'#FFAA00'},{a:133,h:'#3D6699'},{a:150,h:'#4D8CCC'},{a:250,h:'#333333'},{a:254,h:'#CCCCCC'}
+];
+function aciHex(aci){ const e=ACI_PALETTE.find(x=>x.a==aci); return e?e.h:'#888888'; }
+function setSwatch(sw,aci){ sw.dataset.aci=aci; sw.style.background=aciHex(aci); sw.textContent='ACI '+aci; sw.title='ACI '+aci; }
+function openAciPalette(sw){
+  document.querySelectorAll('.aci-menu').forEach(m=>m.remove());
+  const r=sw.getBoundingClientRect();
+  const menu=document.createElement('div'); menu.className='aci-menu';
+  menu.style.left=r.left+'px'; menu.style.top=(r.bottom+3)+'px';
+  ACI_PALETTE.forEach(({a,h})=>{
+    const c=document.createElement('div'); c.className='aci-cell'; c.style.background=h; c.title='ACI '+a;
+    c.addEventListener('mousedown',ev=>{ ev.preventDefault(); setSwatch(sw,a); document.querySelectorAll('.aci-menu').forEach(m=>m.remove()); render(); });
+    menu.appendChild(c);
+  });
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('mousedown',function _h(ev){ if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener('mousedown',_h);} }),0);
+}
+
+// ── combined dropdown lists (block + layer, and zone + block + layer) ──
+function rebuildCombos(){
+  fill("dl-match",   [...BLOCKS, ...LAYERS]);
+  fill("dl-applies", [...zoneNames(), ...BLOCKS, ...LAYERS]);
+}
+
+// ── tag / chip picker (click to open dropdown, pick to add a chip) ──
+function tagField(listId, placeholder, cls){
+  return `<div class="tags ${cls}" onclick="this.querySelector('.tag-in').focus()">`+
+         `<input class="tag-in" data-list="${listId}" placeholder="${placeholder}" `+
+         `onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>`;
+}
+function tagAdd(container, val){
+  val=(val||'').trim(); if(!val) return;
+  const input=container.querySelector('.tag-in');
+  if([...container.querySelectorAll('.tag-chip')].some(c=>c.dataset.v===val)){ input.value=''; return; }
+  const chip=document.createElement('span'); chip.className='tag-chip'; chip.dataset.v=val;
+  const txt=document.createElement('span'); txt.textContent=val;
+  const btn=document.createElement('button'); btn.type='button'; btn.textContent='✕';
+  btn.onclick=(e)=>{ e.stopPropagation(); chip.remove(); render(); };
+  chip.appendChild(txt); chip.appendChild(btn);
+  container.insertBefore(chip, input); input.value='';
+}
+function tagCommit(input){ if(input.value){ tagAdd(input.closest('.tags'), input.value); render(); } }
+function tagKey(e, input){
+  if(e.key==='Enter' || e.key===','){ e.preventDefault(); if(input.value){ tagAdd(input.closest('.tags'), input.value); render(); } }
+  else if(e.key==='Backspace' && !input.value){
+    const chips=input.closest('.tags').querySelectorAll('.tag-chip');
+    if(chips.length){ chips[chips.length-1].remove(); render(); }
+  }
+}
+function tagValues(container){ return [...container.querySelectorAll('.tag-chip')].map(c=>c.dataset.v); }
+function tagSeed(container, str){ (str||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(v=>tagAdd(container,v)); }
+
+// click-to-open dropdown for BOTH tag pickers (.tag-in) and single fields ([data-combo])
+function closeTagMenus(){ document.querySelectorAll('.tag-menu').forEach(m=>m.remove()); }
+function _isPicker(el){ return el && el.getAttribute && (el.classList.contains('tag-in') || el.hasAttribute('data-combo')); }
+function openTagMenu(input, showAll){
+  closeTagMenus();
+  const isTag=input.classList.contains('tag-in');
+  const listId=input.getAttribute('data-list') || input.getAttribute('data-combo') || '';
+  const dl=document.getElementById(listId);
+  let opts=dl ? [...dl.querySelectorAll('option')].map(o=>o.value) : [];
+  const q=showAll ? '' : input.value.trim().toLowerCase();   // click/focus = show all; typing = filter
+  if(isTag){ const have=new Set(tagValues(input.closest('.tags'))); opts=opts.filter(o=>!have.has(o)); }
+  opts=opts.filter(o=>o && (!q || o.toLowerCase().includes(q)));
+  if(!opts.length) return;
+  const r=input.getBoundingClientRect();
+  const menu=document.createElement('div'); menu.className='tag-menu';
+  menu.style.left=r.left+'px'; menu.style.top=(r.bottom+2)+'px'; menu.style.minWidth=Math.max(r.width,150)+'px';
+  opts.slice(0,80).forEach(o=>{
+    const d=document.createElement('div'); d.className='tag-opt'; d.textContent=o;
+    d.addEventListener('mousedown', ev=>{ ev.preventDefault();
+      if(isTag){ tagAdd(input.closest('.tags'),o); } else { input.value=o; }
+      render(); closeTagMenus(); input.focus();
+    });
+    menu.appendChild(d);
+  });
+  document.body.appendChild(menu);
+}
+document.addEventListener('focusin', e=>{ if(_isPicker(e.target)) openTagMenu(e.target, true); });
+document.addEventListener('input',   e=>{ if(_isPicker(e.target)) openTagMenu(e.target, false); });
+document.addEventListener('focusout',e=>{ if(_isPicker(e.target)) setTimeout(closeTagMenus,150); });
+window.addEventListener('scroll', closeTagMenus, true);
+
+// ── zones (shared catalog) ──
+function addZone(name="",ident="polyline",d={}){
+  const row=document.createElement("div"); row.className="rowbox zone";
+  row.innerHTML=`
+    <div class="head"><b>Zone</b><button class="rm" onclick="this.closest('.zone').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Zone name</label><input class="z-name" value="${esc(name)}" placeholder="Sales / Trial / FOH / Toilet" oninput="render()"></div>
+      <div><label>How to find it in the drawing</label><select class="z-ident" onchange="identFields(this);render()">
+        <option value="polyline">a closed outline on a layer</option>
+        <option value="block">a named block</option>
+        <option value="balloon">a room name in the text</option>
+      </select></div>
+    </div>
+    <div class="gap"></div>
+    <div class="z-poly"><label>Layer</label><input class="z-layer" data-combo="dl-closed" value="${esc(d.layer||'')}" placeholder="e.g. PLANO-ZONE / FOH_ZONE_OUTLINE" oninput="render()"></div>
+    <div class="z-block" style="display:none"><label>Block name</label><input class="z-blockname" data-combo="dl-blocks" value="${esc(d.blockname||'')}" oninput="render()"></div>
+    <div class="z-balloon" style="display:none">
+      <div class="flex">
+        <div><label>Room name (text on the plan)</label><input class="z-keyword" data-combo="dl-texts" value="${esc(d.keyword||'')}" placeholder="TOILET" oninput="onRoomWord(this)"></div>
+        <div><label>Text layer (blank = search all)</label><input class="z-textlayer" data-combo="dl-all" value="${esc(d.text_layer||'')}" oninput="render()"></div>
+      </div>
+      <div style="margin-top:8px"><label>Wall / boundary layers — where the room stops growing (blank = whole store)</label>
+        <div class="tags z-bounds" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-all" placeholder="type or pick a wall layer…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
+      </div>
+    </div>`;
+  document.getElementById("zones").appendChild(row);
+  row.querySelector(".z-ident").value=ident; identFields(row.querySelector(".z-ident"));
+  tagSeed(row.querySelector(".z-bounds"), Array.isArray(d.boundaries)?d.boundaries.join(","):(d.boundaries||""));
+  render();
+}
+function identFields(sel){const r=sel.closest(".zone");const k=sel.value;
+  r.querySelector(".z-poly").style.display=k==="polyline"?"block":"none";
+  r.querySelector(".z-block").style.display=k==="block"?"block":"none";
+  r.querySelector(".z-balloon").style.display=k==="balloon"?"block":"none";}
+function onRoomWord(inp){const lay=roomLayerMap[inp.value];
+  if(lay){const tl=inp.closest(".zone").querySelector(".z-textlayer"); if(!tl.value)tl.value=lay;} render();}
+function zoneNames(){return [...document.querySelectorAll("#zones .z-name")].map(i=>i.value.trim()).filter(Boolean);}
+
+// ── flooring types ──
+function fillPatternSelect(sel,val){sel.innerHTML=PATTERNS.map(p=>`<option ${p===val?'selected':''}>${p}</option>`).join("");}
+function addFType(name="",kind="tile",d={}){
+  const row=document.createElement("div"); row.className="rowbox ftype";
+  row.innerHTML=`
+    <div class="head"><b>Flooring type</b><button class="rm" onclick="this.closest('.ftype').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Name</label><input class="f-name" value="${esc(name)}" placeholder="GreyTile" oninput="render()"></div>
+      <div><label>Kind</label><select class="f-kind" onchange="kindFields(this);render()">
+        <option value="tile">tile (pieces)</option><option value="hatch">hatch (pattern)</option><option value="skip">skip (no floor)</option>
+      </select></div>
+    </div>
+    <div class="gap"></div>
+    <div class="f-tile flex">
+      <div><label>Length (mm)</label><input class="f-len" type="number" value="${d.length_mm||600}" oninput="render()"></div>
+      <div><label>Width (mm)</label><input class="f-wid" type="number" value="${d.width_mm||600}" oninput="render()"></div>
+      <div><label>Rotation (°)</label><input class="f-rot" type="number" value="${d.rotation_deg??45}" oninput="render()"></div>
+    </div>
+    <div class="f-hatch flex" style="display:none">
+      <div style="flex:2"><label>Pattern</label><select class="f-pattern" onchange="render()"></select></div>
+      <div><label>Scale</label><input class="f-scale" type="number" value="${d.scale||100}" oninput="render()"></div>
+      <div><label>Angle</label><input class="f-angle" type="number" value="${d.angle||0}" oninput="render()"></div>
+      <div><label>Colour (1–255)</label><input class="f-color" type="number" value="${d.color||8}" oninput="render()"></div>
+    </div>`;
+  document.getElementById("ftypes").appendChild(row);
+  row.querySelector(".f-kind").value=kind;
+  fillPatternSelect(row.querySelector(".f-pattern"), d.pattern||"AR-HBONE");
+  kindFields(row.querySelector(".f-kind")); render();
+}
+function kindFields(sel){const r=sel.closest(".ftype");const k=sel.value;
+  r.querySelector(".f-tile").style.display=k==="tile"?"flex":"none";
+  r.querySelector(".f-hatch").style.display=k==="hatch"?"flex":"none";}
+function typeNames(){return [...document.querySelectorAll("#ftypes .f-name")].map(i=>i.value.trim()).filter(Boolean);}
+
+// ── flooring assignments (zone -> type) ──
+function addFAssign(zone="",ftype=""){
+  const row=document.createElement("div"); row.className="rowbox fassign";
+  row.innerHTML=`
+    <div class="head"><b>Zone flooring</b><button class="rm" onclick="this.closest('.fassign').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Zone</label><select class="fa-zone" onchange="render()"></select></div>
+      <div><label>Flooring type</label><select class="fa-ftype" onchange="render()"></select></div>
+    </div>`;
+  document.getElementById("fassign").appendChild(row);
+  refreshZoneSelects(); refreshTypeSelects();
+  if(zone) row.querySelector(".fa-zone").value=zone;
+  if(ftype) row.querySelector(".fa-ftype").value=ftype;
+  render();
+}
+
+// ── speaker placements ──
+function addSPlace(target="store",position="corners",count=""){
+  const row=document.createElement("div"); row.className="rowbox splace";
+  row.innerHTML=`
+    <div class="head"><b>Speaker placement</b><button class="rm" onclick="this.closest('.splace').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Where</label><select class="sp-target" onchange="render()"></select></div>
+      <div><label>Position</label><select class="sp-pos" onchange="render()">
+        <option value="corners">4 corners</option>
+        <option value="center">center</option>
+        <option value="front">front wall</option>
+        <option value="back">back wall</option>
+        <option value="left">left wall</option>
+        <option value="right">right wall</option>
+        <option value="auto">auto (coverage grid)</option>
+      </select></div>
+      <div><label>Count</label><input class="sp-count" type="number" min="1" value="${count}" placeholder="auto" oninput="render()"></div>
+    </div>
+    <div class="hint">Leave count blank to auto-fit speakers by the coverage radius.</div>`;
+  document.getElementById("splace").appendChild(row);
+  refreshZoneSelects();
+  row.querySelector(".sp-target").value=target;
+  row.querySelector(".sp-pos").value=position;
+  render();
+}
+
+// ── speaker boxes (amplifier box at a zone, e.g. pickup table) ──
+function addSBox(target="store",position="center",count="1"){
+  const row=document.createElement("div"); row.className="rowbox sbox";
+  row.innerHTML=`
+    <div class="head"><b>Speaker box</b><button class="rm" onclick="this.closest('.sbox').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Where</label><select class="sb-target" onchange="render()"></select></div>
+      <div><label>Position</label><select class="sb-pos" onchange="render()">
+        <option value="center">center</option>
+        <option value="front">front wall</option>
+        <option value="back">back wall</option>
+        <option value="left">left wall</option>
+        <option value="right">right wall</option>
+        <option value="corners">4 corners</option>
+      </select></div>
+      <div><label>Count</label><input class="sb-count" type="number" min="1" value="${count}" placeholder="1" oninput="render()"></div>
+    </div>`;
+  document.getElementById("sboxes").appendChild(row);
+  refreshZoneSelects();
+  row.querySelector(".sb-target").value=target;
+  row.querySelector(".sb-pos").value=position;
+  render();
+}
+
+// ── partition: keep-layer groups + zone styling ──
+function addPLayer(group,value=""){
+  const d=document.createElement("div"); d.className="flex"; d.style.marginBottom="6px";
+  d.innerHTML=`<div><input class="pk-layer" data-combo="dl-all" value="${esc(value)}" placeholder="layer name" oninput="render()"></div>
+    <button class="rm" onclick="this.parentElement.remove();render()">✕</button>`;
+  document.getElementById("pk-"+group).appendChild(d); render();
+}
+function addPStyle(zone="",aci=1,lw=50,label=true){
+  const row=document.createElement("div"); row.className="rowbox pstyle";
+  row.innerHTML=`
+    <div class="head"><b>Zone style</b><button class="rm" onclick="this.closest('.pstyle').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Zone</label><select class="ps-zone" onchange="render()"></select></div>
+      <div><label>Outline colour (1–255)</label><input class="ps-aci" type="number" min="1" max="255" value="${aci}" oninput="render()"></div>
+      <div><label>Line thickness (×0.01 mm)</label><input class="ps-lw" type="number" min="0" value="${lw}" oninput="render()"></div>
+    </div>
+    <div class="switch" style="margin-top:8px"><input type="checkbox" class="ps-label" ${label?'checked':''} onchange="render()"><label style="margin:0">Write this zone's area (m²) in its centre</label></div>`;
+  document.getElementById("pstyle").appendChild(row);
+  refreshZoneSelects();
+  if(zone) row.querySelector(".ps-zone").value=zone;
+  render();
+}
+
+// ── electrical: point groups (match → place → label → note) ──
+function addELGroup(match="",place="wall",label="",note="",custom=""){
+  const row=document.createElement("div"); row.className="rowbox elgroup";
+  row.innerHTML=`
+    <div class="head"><b>Point group</b><button class="rm" onclick="this.closest('.elgroup').remove();render()">remove</button></div>
+    <div class="flex">
+      <div style="flex:2"><label>Match — pick block or layer names</label>${tagField('dl-match','type or pick a block / layer…','eg-match')}</div>
+      <div><label>Place as</label><select class="eg-place" onchange="egPlace(this);render()">
+        <option value="wall">Wall point (WP)</option>
+        <option value="ceiling">Ceiling point (CP)</option>
+        <option value="floor">Floor point (FP)</option>
+        <option value="data">Data floor box (CDP)</option>
+        <option value="other">Other — custom type</option>
+      </select></div>
+    </div>
+    <div class="eg-custom-wrap" style="display:none;margin-top:8px"><label>Custom point type name</label><input class="eg-custom" value="${esc(custom)}" placeholder="e.g. Gas point, Emergency stop" oninput="render()"></div>
+    <div class="flex" style="margin-top:8px">
+      <div><label>Label</label><input class="eg-label" value="${esc(label)}" placeholder="WP1" oninput="render()"></div>
+      <div style="flex:2"><label>Note</label><input class="eg-note" value="${esc(note)}" placeholder="6A RAW POINT @2250MM" oninput="render()"></div>
+    </div>`;
+  document.getElementById("elgroups").appendChild(row);
+  row.querySelector(".eg-place").value=place;
+  egPlace(row.querySelector(".eg-place"));
+  tagSeed(row.querySelector(".eg-match"), match);
+  render();
+}
+function egPlace(sel){ const w=sel.closest(".elgroup").querySelector(".eg-custom-wrap"); if(w) w.style.display = sel.value==="other" ? "block" : "none"; }
+
+// ── finishes: material → where → height → colour ──
+function addFinish(name="",applies="",height="",color=""){
+  const row=document.createElement("div"); row.className="rowbox finrow";
+  row.innerHTML=`
+    <div class="head"><b>Finish</b><button class="rm" onclick="this.closest('.finrow').remove();render()">remove</button></div>
+    <div class="flex">
+      <div><label>Material</label><input class="fn-name" value="${esc(name)}" placeholder="Paint / Tile / Mirror" oninput="render()"></div>
+      <div style="flex:2"><label>Where it goes — pick zones or block / layer names</label>${tagField('dl-applies','type or pick a zone / block / layer…','fn-applies')}</div>
+      <div><label>Height up wall (mm)</label><input class="fn-height" type="number" min="0" value="${height}" placeholder="2400" oninput="render()"></div>
+      <div><label>Colour</label><div class="aci-swatch fn-color" onclick="openAciPalette(this)"></div></div>
+    </div>`;
+  document.getElementById("finlist").appendChild(row);
+  setSwatch(row.querySelector(".fn-color"), color||5);
+  tagSeed(row.querySelector(".fn-applies"), applies);
+  render();
+}
+
+// ── dropdowns that depend on the zone / type catalogs ──
+function refreshZoneSelects(){
+  const names=zoneNames();
+  document.querySelectorAll(".fa-zone").forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=`<option value="">(pick a zone)</option>`+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join("");
+  });
+  document.querySelectorAll(".sp-target").forEach(sel=>{
+    const cur=sel.value||"store";
+    sel.innerHTML=`<option value="store">Whole store (coverage)</option>`+
+      names.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join("");
+    sel.value=cur;
+  });
+  document.querySelectorAll(".sb-target").forEach(sel=>{
+    const cur=sel.value||"store";
+    sel.innerHTML=`<option value="store">Whole store</option>`+
+      names.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join("");
+    sel.value=cur;
+  });
+  document.querySelectorAll(".ps-zone").forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join("")||`<option value="">(define a zone first)</option>`;
+    if(cur) sel.value=cur;
+  });
+  rebuildCombos();
+}
+function refreshTypeSelects(){
+  const names=typeNames();
+  document.querySelectorAll(".fa-ftype").forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=`<option value="">(skip — no floor)</option>`+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join("");
+  });
+  const ds=document.getElementById("defaultType"); const cur=ds.value;
+  ds.innerHTML=names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join("")||`<option value="">(none)</option>`;
+}
+
+// ── build config ──
+function buildConfig(){
+  refreshZoneSelects(); refreshTypeSelects();
+
+  // shared zone catalog (defined once) ----------------------------------
+  const zones={};
+  [...document.querySelectorAll("#zones .zone")].forEach((r,i)=>{
+    const name=r.querySelector(".z-name").value.trim()||("Zone-"+(i+1));
+    const ident=r.querySelector(".z-ident").value;
+    const z={identifier:ident};
+    if(ident==="polyline"){const l=r.querySelector(".z-layer").value.trim(); if(!l)return; z.layer=l;}
+    else if(ident==="block"){const b=r.querySelector(".z-blockname").value.trim(); if(!b)return; z.blockname=b;}
+    else if(ident==="balloon"){const k=r.querySelector(".z-keyword").value.trim(); if(!k)return; z.keyword=k; const tl=r.querySelector(".z-textlayer").value.trim(); if(tl)z.text_layer=tl; const bnd=tagValues(r.querySelector(".z-bounds")); if(bnd.length)z.boundaries=bnd;}
+    zones[name]=z;
+  });
+
+  // flooring types -------------------------------------------------------
+  const ftypes=[...document.querySelectorAll("#ftypes .ftype")].map(r=>{
+    const name=r.querySelector(".f-name").value.trim(); const kind=r.querySelector(".f-kind").value;
+    if(!name)return null;
+    if(kind==="tile")return{name,kind,length_mm:+r.querySelector(".f-len").value||600,width_mm:+r.querySelector(".f-wid").value||600,rotation_deg:+r.querySelector(".f-rot").value||0};
+    if(kind==="hatch")return{name,kind,pattern:r.querySelector(".f-pattern").value,scale:+r.querySelector(".f-scale").value||1,angle:+r.querySelector(".f-angle").value||0,color:+r.querySelector(".f-color").value||8};
+    return{name,kind:"skip"};
+  }).filter(Boolean);
+
+  // flooring assignments: each references a zone by $ref -----------------
+  const fzones=[...document.querySelectorAll("#fassign .fassign")].map(r=>{
+    const zn=r.querySelector(".fa-zone").value;
+    const ft=r.querySelector(".fa-ftype").value;
+    if(!zn || !(zn in zones))return null;
+    return {zone:{"$ref":"#/zones/"+zn}, flooring_type:ft};
+  }).filter(Boolean);
+
+  const store=document.getElementById("storeLayer").value.trim();
+  const keeps=[...document.querySelectorAll("#keeps .k-layer")].map(i=>i.value.trim()).filter(Boolean);
+
+  const cfg={
+    schema_version:"3.1",units:"mm",
+    "_comment":"$ref: a {\"$ref\": \"#/zones/<name>\"} node resolves to that entry in the shared 'zones' catalog; sibling keys override. Zones are defined once and reused by flooring + speaker.",
+    io:{input_dxf:"",output_dxf:"",ctx_file:"context.ctx"},
+    zones,
+    flooring_types:ftypes,
+    default_flooring_type:document.getElementById("defaultType").value||null,
+    flooring:{store_outline:{layers:store?[store]:[]},zones:fzones,wall_frame:{mirror_layers:keeps,hatch_layers:[]}}
+  };
+
+  // speaker docket (optional) — two modes: auto-by-coverage OR manual placement
+  if(document.getElementById("spEnabled").checked){
+    const mode=document.getElementById("sp-mode").value;
+    const model={
+      speaker_size_mm:+document.getElementById("sp-size").value||300,
+      coverage_radius_mm:+document.getElementById("sp-cov").value||4000
+    };
+    const speaker={ docket:"speaker", enabled:true, mode, model };
+
+    if(mode==="coverage"){
+      const pattern=document.getElementById("sp-cov-pattern").value;
+      const targets=tagValues(document.querySelector(".sp-cov-zones"))
+        .filter(t => t!=="store")
+        .map(t => (t in zones) ? {"$ref":"#/zones/"+t} : t);
+      speaker.coverage = targets.length ? { targets, pattern } : { target:"store", pattern };
+    } else {
+      model.box_width_mm =+document.getElementById("sb-w").value||400;
+      model.box_height_mm=+document.getElementById("sb-h").value||200;
+      speaker.placements=[...document.querySelectorAll("#splace .splace")].map(r=>{
+        const t=r.querySelector(".sp-target").value;
+        const cntRaw=r.querySelector(".sp-count").value.trim();
+        const target = (t==="store") ? "store" : (t in zones ? {"$ref":"#/zones/"+t} : null);
+        if(target===null) return null;
+        return {target, position:r.querySelector(".sp-pos").value, count: cntRaw===""?null:(+cntRaw||1)};
+      }).filter(Boolean);
+      speaker.boxes=[...document.querySelectorAll("#sboxes .sbox")].map(r=>{
+        const t=r.querySelector(".sb-target").value;
+        const cntRaw=r.querySelector(".sb-count").value.trim();
+        const target = (t==="store") ? "store" : (t in zones ? {"$ref":"#/zones/"+t} : null);
+        if(target===null) return null;
+        return {target, position:r.querySelector(".sb-pos").value, count: cntRaw===""?1:(+cntRaw||1)};
+      }).filter(Boolean);
+    }
+    cfg.speaker=speaker;
+  }
+
+  // sprinkler docket (optional) — 100% coverage of the whole store
+  if(document.getElementById("skEnabled").checked){
+    const minRoom=document.getElementById("sk-minroom").checked;
+    cfg.sprinkler={
+      docket:"sprinkler", enabled:true,
+      model:{
+        coverage_radius_mm:+document.getElementById("sk-rad").value||2300,
+        max_spacing_mm:+document.getElementById("sk-space").value||3700,
+        pattern:document.getElementById("sk-pattern").value,
+        coverage:"full"
+      },
+      target:"store",
+      min_one_per_room:minRoom
+    };
+    if(minRoom){
+      const rooms=tagValues(document.querySelector(".sk-rooms"))
+        .map(t => (t in zones) ? {"$ref":"#/zones/"+t} : t);
+      if(rooms.length) cfg.sprinkler.rooms=rooms;
+    }
+  }
+
+  // partition docket (optional) — purge + zone styling + area labels
+  if(document.getElementById("ptEnabled").checked){
+    const grp=g=>[...document.querySelectorAll("#pk-"+g+" .pk-layer")].map(i=>i.value.trim()).filter(Boolean);
+    const boundary=grp("boundary");
+    if(store && !boundary.includes(store)) boundary.unshift(store);  // store outline is always the boundary
+    const style=[...document.querySelectorAll("#pstyle .pstyle")].map(r=>{
+      const zn=r.querySelector(".ps-zone").value;
+      if(!zn || !(zn in zones)) return null;
+      return {
+        zone:{"$ref":"#/zones/"+zn},
+        color_aci:+r.querySelector(".ps-aci").value||7,
+        lineweight:+r.querySelector(".ps-lw").value||25,
+        label_area:r.querySelector(".ps-label").checked
+      };
+    }).filter(Boolean);
+    cfg.partition={
+      docket:"partition", enabled:true,
+      keep:{ boundary, structural:grp("structural"), partitions:grp("partitions"), text:grp("text") },
+      style,
+      label_layer:document.getElementById("pt-labellayer").value.trim()||"SYSTEM_LABELS"
+    };
+  }
+
+  // electrical docket (optional) — point groups: match → place → label → note
+  if(document.getElementById("elEnabled").checked){
+    const groups=[...document.querySelectorAll("#elgroups .elgroup")].map(r=>{
+      const match=tagValues(r.querySelector(".eg-match"));
+      const label=r.querySelector(".eg-label").value.trim();
+      if(!match.length || !label) return null;
+      let place=r.querySelector(".eg-place").value;
+      if(place==="other") place=r.querySelector(".eg-custom").value.trim()||"custom";
+      return {match, place, label, note:r.querySelector(".eg-note").value.trim()};
+    }).filter(Boolean);
+    cfg.electrical={
+      docket:"electrical", enabled:true,
+      groups
+    };
+  }
+
+  // finishes docket (optional) — material → where it applies → height (BOQ area)
+  if(document.getElementById("fnEnabled").checked){
+    const materials=[...document.querySelectorAll("#finlist .finrow")].map(r=>{
+      const name=r.querySelector(".fn-name").value.trim();
+      const tokens=tagValues(r.querySelector(".fn-applies"));
+      if(!name || !tokens.length) return null;
+      const applies_to=tokens.map(t => (t in zones) ? {"$ref":"#/zones/"+t} : t);
+      const m={name, applies_to, height_mm:+r.querySelector(".fn-height").value||2400};
+      const sw=r.querySelector(".fn-color"); if(sw && sw.dataset.aci) m.color_aci=+sw.dataset.aci;
+      return m;
+    }).filter(Boolean);
+    cfg.finishes={
+      docket:"finishes", enabled:true,
+      materials
+    };
+  }
+
+  // skirting docket (optional) — base strip along walls of chosen zones (running metres)
+  if(document.getElementById("skrEnabled").checked){
+    const skrZones=tagValues(document.querySelector(".skr-zones"))
+      .map(t => (t in zones) ? {"$ref":"#/zones/"+t} : t);
+    const skrExclude=tagValues(document.querySelector(".skr-exclude"))
+      .map(t => (t in zones) ? {"$ref":"#/zones/"+t} : t);
+    cfg.skirting={
+      docket:"skirting", enabled:true,
+      zones: skrZones,
+      height_mm:+document.getElementById("skr-height").value||100,
+      measure:"length"
+    };
+    if(skrExclude.length) cfg.skirting.exclude=skrExclude;
+  }
+  return cfg;
+}
+function addKeep(layer=""){
+  const d=document.createElement("div"); d.className="flex"; d.style.marginBottom="8px";
+  d.innerHTML=`<div><input class="k-layer" data-combo="dl-all" value="${esc(layer)}" placeholder="e.g. A-WALL HATCH" oninput="render()"></div>
+    <button class="rm" onclick="this.parentElement.remove();render()">✕</button>`;
+  document.getElementById("keeps").appendChild(d); render();
+}
+
+function render(){
+  document.getElementById("speakerBody").style.display=document.getElementById("spEnabled").checked?"block":"none";
+  const _spMode=document.getElementById("sp-mode").value;
+  document.getElementById("sp-coverage-box").style.display=_spMode==="coverage"?"block":"none";
+  document.getElementById("sp-placement-box").style.display=_spMode==="coverage"?"none":"block";
+  document.getElementById("sprinklerBody").style.display=document.getElementById("skEnabled").checked?"block":"none";
+  document.getElementById("sk-rooms-box").style.display=document.getElementById("sk-minroom").checked?"block":"none";
+  document.getElementById("partitionBody").style.display=document.getElementById("ptEnabled").checked?"block":"none";
+  document.getElementById("electricalBody").style.display=document.getElementById("elEnabled").checked?"block":"none";
+  document.getElementById("finishesBody").style.display=document.getElementById("fnEnabled").checked?"block":"none";
+  document.getElementById("skirtingBody").style.display=document.getElementById("skrEnabled").checked?"block":"none";
+  const cfg=buildConfig();
+  document.getElementById("out").textContent=JSON.stringify(cfg,null,2);
+  const ready=cfg.flooring.store_outline.layers.length>0 && dxfFile && cfg.flooring_types.length>0;
+  document.getElementById("genBtn").disabled=!ready;
+  document.getElementById("genHint").style.display=ready?"none":"block";
+}
+
+// ── generate ──
+async function generate(){
+  const btn=document.getElementById("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Generating…';
+  const res=document.getElementById("result"); res.classList.add("show");
+  document.getElementById("resultMsg").textContent="Running…"; document.getElementById("dlLinks").innerHTML=""; document.getElementById("log").textContent="";
+  const fd=new FormData(); fd.append("dxf",dxfFile); fd.append("config",JSON.stringify(buildConfig()));
+  try{
+    const j=await (await fetch("/generate",{method:"POST",body:fd})).json();
+    let logText="";
+    if((j.errors||[]).length) logText+="ERRORS:\n"+j.errors.join("\n")+"\n\n";
+    for(const [name,d] of Object.entries(j.dockets||{})){
+      logText+=`[${name}] ${d.ok?"OK":"FAILED"}${d.error?" — "+d.error:""}\n`;
+      (d.warnings||[]).forEach(w=>logText+=`   ⚠ ${w}\n`);
+      if(d.boq&&Object.keys(d.boq).length) logText+="   BOQ: "+JSON.stringify(d.boq)+"\n";
+    }
+    if((j.warnings||[]).length) logText+="\nZONE WARNINGS:\n"+j.warnings.map(w=>"⚠ "+w).join("\n")+"\n";
+    document.getElementById("log").textContent=(logText+"\n"+(j.log||"")).trim()||j.error||"(no output)";
+    const links=document.getElementById("dlLinks");
+    for(const [name,d] of Object.entries(j.dockets||{})){
+      if(d.download){const a=document.createElement("a"); a.className="btn"; a.style.textDecoration="none";
+        a.href=d.download; a.textContent="⬇ "+name+".dxf"; a.setAttribute("download",""); links.appendChild(a);}
+    }
+    if(j.ok&&j.job) document.getElementById("resultMsg").innerHTML='<span class="ok">✓ Generated</span>';
+    else document.getElementById("resultMsg").innerHTML='<span class="bad">✕ Failed — see log</span>';
+  }catch(e){document.getElementById("resultMsg").innerHTML='<span class="bad">✕ '+e.message+'</span>';}
+  btn.innerHTML="Generate Layout"; render();
+}
+function copyJson(){navigator.clipboard.writeText(JSON.stringify(buildConfig(),null,2));}
+function downloadCfg(){const b=new Blob([JSON.stringify(buildConfig(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="layout_config.json";a.click();URL.revokeObjectURL(a.href);}
+
+// ── seed ──
+addZone("Toilet","balloon",{keyword:"TOILET",boundaries:["A-WALL","LK-PARTITION"]});
+addZone("FOH","polyline",{layer:"FOH_ZONE_OUTLINE"});
+addZone("PickupTable","balloon",{keyword:"PICKUP"});
+addFType("GreyTile","tile",{length_mm:600,width_mm:600,rotation_deg:45});
+addFType("NoFloor","skip");
+addFAssign("Toilet","NoFloor");
+addSPlace("FOH","corners","");
+addSPlace("Toilet","center","1");
+addSBox("PickupTable","center","1");
+tagSeed(document.querySelector(".sk-rooms"), "Toilet, Clinic1");
+addZone("Sales","polyline",{layer:"PLANO-ZONE"});
+addZone("Storage","polyline",{layer:"STORAGE_AREA_OUTLINE"});
+["A-WALL","A-COL","A-BEAM PLAN"].forEach(l=>addPLayer("structural",l));
+["LK-PARTITION","I-LK CURTAIN","A-SHUTTER"].forEach(l=>addPLayer("partitions",l));
+addPLayer("text","LK-ROOM TAG");
+addPStyle("Storage",1,50,true);
+addPStyle("Sales",3,35,false);
+// finishes seed (adds BOH + Clinic1 shared zones)
+addZone("BOH","polyline",{layer:"BOH_ZONE_1_OUTLINE"});
+addZone("Clinic1","polyline",{layer:"CLINIC_1_OUTLINE"});
+addFinish("Paint","BOH, PickupTable","2400","5");
+addFinish("Tile","Clinic1","2100","6");
+addFinish("Fluting","FOH","2400","40");
+addFinish("Mirror","LK-MIRROR","2325","133");
+addFinish("Laminate","FACADE-LAMINATE","1000","3");
+addFinish("ACP","FACADE-ACP","1000","1");
+tagSeed(document.querySelector(".skr-zones"), "FOH, Clinic1");
+tagSeed(document.querySelector(".skr-exclude"), "Toilet");
+// electrical seed
+addELGroup("JJ_FIXTURE_, VC_FIXTURE_, MIRROR_","wall","WP1","6A RAW POINT @2250MM");
+addELGroup("SCREEN_55, NEON_LIGHT_BOX","ceiling","CP4","2x 6/16A SOCKET + CAT6 IN CEILING");
+addELGroup("QMS_DESK, BILLING_COUNTER, STANDING_TABLE","floor","FP2","6/16A RAW IN FLOOR");
+addELGroup("PICKUP_TABLE","data","CT1","3-CONDUIT FLOOR BOX (DATA/UPS/16A)");
+addELGroup("GAS_POINT","other","GP1","1/2\" GAS CONNECTION","Gas point");
+["A-WALL HATCH","A-WALL","LK-PARTITION","A-COL","A-COL HATCH","A-BEAM PLAN","A-GLAZING","A-SHUTTER","A-GLASS DOOR"].forEach(addKeep);
+render();
+</script>
+</body>
+</html>
