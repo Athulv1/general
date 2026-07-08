@@ -271,6 +271,7 @@ def normalize(cfg: Dict[str, Any]) -> Dict[str, Any]:
             "hatch_layers": _as_list(wf.get("hatch_layers")),
             "exclude_insert_layers": _as_list(wf.get("exclude_insert_layers")),
             "exclude_block_names": _as_list(wf.get("exclude_block_names")),
+            "hatch_scale": wf.get("hatch_scale"),
         }
         out["flooring"] = fl
 

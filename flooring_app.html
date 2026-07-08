@@ -304,6 +304,11 @@
       <div id="keeps"></div>
       <button class="add" onclick="addKeep()">+ Add wall layer</button>
       <div class="gap"></div>
+      <div class="flex">
+        <div><label>Wall hatch scale</label><input type="number" id="wall-hatch-scale" min="0" step="0.1" value="10" oninput="render()"></div>
+      </div>
+      <div class="hint">Rescales the hatch pattern inside wall layers when copied to the output.</div>
+      <div class="gap"></div>
       <label>Door / opening layers — optional. Doors and openings drawn on these layers are treated as gaps: no skirting or wall finish runs across them.</label>
       <div class="tags door-layers" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-all" placeholder="type or pick a door layer…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div>
     </div>
@@ -473,7 +478,7 @@ function addZone(name="",ident="polyline",d={}){
     <div class="z-block" style="display:none"><label>Block name</label><input class="z-blockname" data-combo="dl-blocks" value="${esc(d.blockname||'')}" oninput="render()"></div>
     <div class="z-balloon" style="display:none">
       <div class="flex">
-        <div><label>Room name (text on the plan)</label><input class="z-keyword" data-combo="dl-texts" value="${esc(d.keyword||'')}" placeholder="TOILET" oninput="onRoomWord(this)"></div>
+        <div><label>Room names (text on the plan) — add one or more</label><div class="tags z-keyword" onclick="this.querySelector('.tag-in').focus()"><input class="tag-in" data-list="dl-texts" placeholder="type or pick a room name…" onkeydown="tagKey(event,this)" onchange="tagCommit(this)"></div></div>
         <div><label>Text layer (blank = search all)</label><input class="z-textlayer" data-combo="dl-all" value="${esc(d.text_layer||'')}" oninput="render()"></div>
       </div>
       <div style="margin-top:8px"><label>Wall / boundary layers — where the room stops growing (blank = whole store)</label>
@@ -482,6 +487,7 @@ function addZone(name="",ident="polyline",d={}){
     </div>`;
   document.getElementById("zones").appendChild(row);
   row.querySelector(".z-ident").value=ident; identFields(row.querySelector(".z-ident"));
+  tagSeed(row.querySelector(".z-keyword"), Array.isArray(d.keywords)?d.keywords.join(","):(d.keyword||d.keywords||""));
   tagSeed(row.querySelector(".z-bounds"), Array.isArray(d.boundaries)?d.boundaries.join(","):(d.boundaries||""));
   render();
 }
@@ -709,7 +715,7 @@ function buildConfig(){
     const z={identifier:ident};
     if(ident==="polyline"){const l=r.querySelector(".z-layer").value.trim(); if(!l)return; z.layer=l;}
     else if(ident==="block"){const b=r.querySelector(".z-blockname").value.trim(); if(!b)return; z.blockname=b;}
-    else if(ident==="balloon"){const k=r.querySelector(".z-keyword").value.trim(); if(!k)return; z.keyword=k; const tl=r.querySelector(".z-textlayer").value.trim(); if(tl)z.text_layer=tl; const bnd=tagValues(r.querySelector(".z-bounds")); if(bnd.length)z.boundaries=bnd;}
+    else if(ident==="balloon"){const kw=tagValues(r.querySelector(".z-keyword")); if(!kw.length)return; z.keywords=kw; const tl=r.querySelector(".z-textlayer").value.trim(); if(tl)z.text_layer=tl; const bnd=tagValues(r.querySelector(".z-bounds")); if(bnd.length)z.boundaries=bnd;}
     zones[name]=z;
   });
 
@@ -740,7 +746,7 @@ function buildConfig(){
     zones,
     flooring_types:ftypes,
     default_flooring_type:document.getElementById("defaultType").value||null,
-    flooring:{store_outline:{layers:store?[store]:[]},zones:fzones,wall_frame:{mirror_layers:keeps,hatch_layers:[]}}
+    flooring:{store_outline:{layers:store?[store]:[]},zones:fzones,wall_frame:{mirror_layers:keeps,hatch_layers:[],hatch_scale:+document.getElementById("wall-hatch-scale").value||10}}
   };
   const doorLayers=tagValues(document.querySelector(".door-layers"));
   if(doorLayers.length) cfg.walls={door_layers:doorLayers};

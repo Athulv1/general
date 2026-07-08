@@ -462,6 +462,37 @@ def import_wall_frame(doc, ctx: "Ctx", out: Out, result: DocketResult) -> None:
         result.warn("wall_frame layers configured but no entities found "
                     "(top level or inside blocks)")
 
+    # apply the configured wall-hatch scale (overrides the source DXF's own
+    # pattern scale) — only when wall_frame.hatch_scale is set.
+    hs = wf.get("hatch_scale")
+    if hs not in (None, "", 0, 0.0):
+        try:
+            hs = float(hs)
+            rescaled = 0
+            for e in out.msp:
+                if e.dxftype() != "HATCH":
+                    continue
+                try:
+                    if (e.dxf.layer or "").strip().lower() not in wanted:
+                        continue
+                    if e.dxf.solid_fill:
+                        continue
+                    name = e.dxf.pattern_name
+                    if not name or name.upper() == "SOLID":
+                        continue
+                    e.set_pattern_fill(
+                        name, scale=hs,
+                        angle=float(e.dxf.pattern_angle or 0.0),
+                        color=e.dxf.color)
+                    rescaled += 1
+                except Exception:
+                    pass
+            if rescaled:
+                log.info("[%s] wall hatch scale set to %g on %d hatch(es)",
+                         result.name, hs, rescaled)
+        except Exception as exc:
+            result.warn(f"wall hatch scale not applied: {exc}")
+
 
 def _fix_hatch_pattern(entity) -> None:
     """Rebuild a copied HATCH's pattern definition from its own name/scale/

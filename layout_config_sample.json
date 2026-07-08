@@ -32,7 +32,8 @@
     ],
     "wall_frame": {
       "mirror_layers": ["WALL-LAYER-1", "WALL-HATCH-LAYER", "PARTITION-LAYER"],
-      "hatch_layers": []
+      "hatch_layers": [],
+      "hatch_scale": 10
     }
   },
 

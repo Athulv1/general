@@ -16,8 +16,8 @@ from dockets.base import (Ctx, DocketResult, Out, add_line_geom, add_text,
                           geom_length, iter_polys, union_polys)
 import config_loader
 
-_EXCLUDE_BUFFER_MM = 100.0  # tolerance around excluded geometry
-_DOOR_BUFFER_MM = 100.0     # tolerance around door/opening segments
+_EXCLUDE_BUFFER_MM = 50.0  # tolerance around excluded geometry
+_DOOR_BUFFER_MM = 5.0     # tolerance around door/opening segments
 
 
 def generate(doc, ctx: Ctx, docket_cfg: Dict[str, Any], out: Out
